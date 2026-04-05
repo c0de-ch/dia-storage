@@ -1,0 +1,65 @@
+name: Build macOS Dia-Uploader
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Build Dia-Uploader
+        run: |
+          cd macos
+          xcodebuild -project DiaUploader.xcodeproj \
+            -scheme DiaUploader \
+            -configuration Release \
+            -derivedDataPath build \
+            -arch arm64 -arch x86_64 \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            build
+
+      - name: Package app
+        run: |
+          APP_PATH=$(find macos/build -name "DiaUploader.app" -type d | head -1)
+          echo "Found app at: $APP_PATH"
+          cd $(dirname "$APP_PATH")
+          zip -r "$GITHUB_WORKSPACE/DiaUploader-macOS.zip" DiaUploader.app
+          ls -la "$GITHUB_WORKSPACE/DiaUploader-macOS.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiaUploader-macOS
+          path: DiaUploader-macOS.zip
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: DiaUploader-macOS.zip
+          body: |
+            ## Dia-Uploader per macOS
+
+            App companion per caricare automaticamente le diapositive dallo scanner Reflecta DigitDia Evolution.
+
+            ### Installazione
+            1. Scarica `DiaUploader-macOS.zip`
+            2. Decomprimi e sposta `DiaUploader.app` nella cartella Applicazioni
+            3. Apri l'app (potrebbe essere necessario andare in Impostazioni > Privacy e Sicurezza > "Apri comunque")
+            4. Configura: URL del server + chiave API
+
+            ### Requisiti
+            - macOS 13.0 (Ventura) o successivo
+            - Connessione al server dia-storage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

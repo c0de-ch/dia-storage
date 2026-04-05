@@ -30,7 +30,7 @@ export const GET = withAuth(async (request: NextRequest, context) => {
 
     const slideIds = collectionSlideRows.map((cs) => cs.slideId);
 
-    let slides: any[] = [];
+    let slides: (typeof schema.slides.$inferSelect)[] = [];
     if (slideIds.length > 0) {
       slides = await db
         .select()

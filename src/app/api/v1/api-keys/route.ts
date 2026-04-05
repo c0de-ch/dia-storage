@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth, withAdmin } from '@/lib/auth/middleware';
+import { withAuth, withAdmin, AuthenticatedRequest } from '@/lib/auth/middleware';
 import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -51,7 +51,7 @@ export const POST = withAuth(async (request: NextRequest) => {
       .values({
         name,
         key: hashedKey,
-        userId: (request as any).user.id,
+        userId: (request as AuthenticatedRequest).user.id,
       })
       .returning({
         id: schema.apiKeys.id,

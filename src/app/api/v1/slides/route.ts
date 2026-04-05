@@ -33,14 +33,16 @@ export const GET = withAuth(async (request: NextRequest) => {
 
     const total = totalResult.total;
 
-    const orderColumn = schema.slides[sortBy as keyof typeof schema.slides] || schema.slides.createdAt;
     const orderFn = sortOrder === 'asc' ? asc : desc;
+    const orderExpr = sortBy === 'title' ? orderFn(schema.slides.title)
+      : sortBy === 'dateTakenPrecise' ? orderFn(schema.slides.dateTakenPrecise)
+      : orderFn(schema.slides.createdAt);
 
     const slides = await db
       .select()
       .from(schema.slides)
       .where(whereClause)
-      .orderBy(orderFn(orderColumn as any))
+      .orderBy(orderExpr)
       .limit(limit)
       .offset(offset);
 

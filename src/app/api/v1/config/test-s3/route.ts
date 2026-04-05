@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import * as schema from '@/lib/db/schema';
 import { withAdmin } from '@/lib/auth/middleware';
-import { t } from '@/lib/i18n';
-import { S3Client, ListBucketsCommand } from '@aws-sdk/client-s3';
+import { S3Client, type S3ClientConfig, ListBucketsCommand } from '@aws-sdk/client-s3';
 
 export const POST = withAdmin(async (request: NextRequest) => {
   try {
@@ -25,7 +22,7 @@ export const POST = withAdmin(async (request: NextRequest) => {
       );
     }
 
-    const clientConfig: Record<string, unknown> = {
+    const clientConfig: S3ClientConfig = {
       region: s3Region,
       credentials: {
         accessKeyId: s3AccessKey,
@@ -38,7 +35,7 @@ export const POST = withAdmin(async (request: NextRequest) => {
       clientConfig.forcePathStyle = true;
     }
 
-    const s3Client = new S3Client(clientConfig as any);
+    const s3Client = new S3Client(clientConfig);
     const command = new ListBucketsCommand({});
     const response = await s3Client.send(command);
 
