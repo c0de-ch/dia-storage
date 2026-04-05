@@ -1,0 +1,123 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import * as schema from '@/lib/db/schema';
+import { withAuth } from '@/lib/auth/middleware';
+import { t } from '@/lib/i18n';
+import { eq } from 'drizzle-orm';
+
+export const GET = withAuth(async (request: NextRequest, context) => {
+  try {
+    const { id } = await (context as { params: Promise<{ id: string }> }).params;
+    const numericId = Number(id);
+
+    const [magazine] = await db
+      .select()
+      .from(schema.magazines)
+      .where(eq(schema.magazines.id, numericId))
+      .limit(1);
+
+    if (!magazine) {
+      return NextResponse.json(
+        { success: false, message: 'Caricatore non trovato.' },
+        { status: 404 }
+      );
+    }
+
+    const slides = await db
+      .select()
+      .from(schema.slides)
+      .where(eq(schema.slides.magazineId, numericId));
+
+    return NextResponse.json({
+      success: true,
+      magazine: {
+        ...magazine,
+        slides,
+      },
+    });
+  } catch (error) {
+    console.error('Errore nel recupero del caricatore:', error);
+    return NextResponse.json(
+      { success: false, message: 'Errore interno del server.' },
+      { status: 500 }
+    );
+  }
+});
+
+export const PATCH = withAuth(async (request: NextRequest, context) => {
+  try {
+    const { id } = await (context as { params: Promise<{ id: string }> }).params;
+    const numericId = Number(id);
+    const body = await request.json();
+
+    const [existing] = await db
+      .select()
+      .from(schema.magazines)
+      .where(eq(schema.magazines.id, numericId))
+      .limit(1);
+
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, message: 'Caricatore non trovato.' },
+        { status: 404 }
+      );
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.description !== undefined) updateData.description = body.description;
+    updateData.updatedAt = new Date();
+
+    const [updatedMagazine] = await db
+      .update(schema.magazines)
+      .set(updateData)
+      .where(eq(schema.magazines.id, numericId))
+      .returning();
+
+    return NextResponse.json({
+      success: true,
+      magazine: updatedMagazine,
+    });
+  } catch (error) {
+    console.error('Errore nell\'aggiornamento del caricatore:', error);
+    return NextResponse.json(
+      { success: false, message: 'Errore interno del server.' },
+      { status: 500 }
+    );
+  }
+});
+
+export const DELETE = withAuth(async (request: NextRequest, context) => {
+  try {
+    const { id } = await (context as { params: Promise<{ id: string }> }).params;
+    const numericId = Number(id);
+
+    const [existing] = await db
+      .select()
+      .from(schema.magazines)
+      .where(eq(schema.magazines.id, numericId))
+      .limit(1);
+
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, message: 'Caricatore non trovato.' },
+        { status: 404 }
+      );
+    }
+
+    await db
+      .delete(schema.magazines)
+      .where(eq(schema.magazines.id, numericId));
+
+    return NextResponse.json({
+      success: true,
+      message: 'Caricatore eliminato con successo.',
+    });
+  } catch (error) {
+    console.error('Errore nell\'eliminazione del caricatore:', error);
+    return NextResponse.json(
+      { success: false, message: 'Errore interno del server.' },
+      { status: 500 }
+    );
+  }
+});

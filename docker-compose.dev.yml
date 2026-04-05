@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: dia-storage-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dia
+      POSTGRES_PASSWORD: dia
+      POSTGRES_DB: dia_storage
+    ports:
+      - "5432:5432"
+    volumes:
+      - dia_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dia -d dia_storage"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dia_pgdata:
+    driver: local

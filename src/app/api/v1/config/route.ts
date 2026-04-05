@@ -1,0 +1,92 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import * as schema from '@/lib/db/schema';
+import { withAdmin } from '@/lib/auth/middleware';
+import { t } from '@/lib/i18n';
+import { eq } from 'drizzle-orm';
+
+const SENSITIVE_FIELDS = [
+  'smtpPassword',
+  'whatsappApiKey',
+  's3SecretKey',
+  'nasPassword',
+];
+
+function maskSensitiveFields(config: Record<string, unknown>): Record<string, unknown> {
+  const masked = { ...config };
+  for (const field of SENSITIVE_FIELDS) {
+    if (masked[field] && typeof masked[field] === 'string') {
+      const value = masked[field] as string;
+      masked[field] = value.length > 4
+        ? '****' + value.slice(-4)
+        : '****';
+    }
+  }
+  return masked;
+}
+
+export const GET = withAdmin(async (request: NextRequest) => {
+  try {
+    const configs = await db.select().from(schema.settings);
+
+    const configMap: Record<string, unknown> = {};
+    for (const row of configs) {
+      configMap[row.key] = row.value;
+    }
+
+    return NextResponse.json({
+      success: true,
+      config: maskSensitiveFields(configMap),
+    });
+  } catch (error) {
+    console.error('Errore nel recupero della configurazione:', error);
+    return NextResponse.json(
+      { success: false, message: 'Errore interno del server.' },
+      { status: 500 }
+    );
+  }
+});
+
+export const PUT = withAdmin(async (request: NextRequest) => {
+  try {
+    const body = await request.json();
+
+    if (!body || typeof body !== 'object' || Object.keys(body).length === 0) {
+      return NextResponse.json(
+        { success: false, message: 'Dati di configurazione obbligatori.' },
+        { status: 400 }
+      );
+    }
+
+    for (const [key, value] of Object.entries(body)) {
+      const [existing] = await db
+        .select()
+        .from(schema.settings)
+        .where(eq(schema.settings.key, key))
+        .limit(1);
+
+      if (existing) {
+        await db
+          .update(schema.settings)
+          .set({ value: String(value), updatedAt: new Date() })
+          .where(eq(schema.settings.key, key));
+      } else {
+        await db.insert(schema.settings).values({
+          key,
+          value: String(value),
+        });
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Configurazione aggiornata con successo.',
+    });
+  } catch (error) {
+    console.error('Errore nell\'aggiornamento della configurazione:', error);
+    return NextResponse.json(
+      { success: false, message: 'Errore interno del server.' },
+      { status: 500 }
+    );
+  }
+});

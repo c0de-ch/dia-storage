@@ -1,0 +1,126 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import * as schema from '@/lib/db/schema';
+import { withAuth } from '@/lib/auth/middleware';
+import { t } from '@/lib/i18n';
+import { eq } from 'drizzle-orm';
+
+export const GET = withAuth(async (request: NextRequest, context) => {
+  try {
+    const { id } = await (context as { params: Promise<{ id: string }> }).params;
+    const numericId = Number(id);
+
+    const [slide] = await db
+      .select()
+      .from(schema.slides)
+      .where(eq(schema.slides.id, numericId))
+      .limit(1);
+
+    if (!slide) {
+      return NextResponse.json(
+        { success: false, message: 'Diapositiva non trovata.' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      slide,
+    });
+  } catch (error) {
+    console.error('Errore nel recupero della diapositiva:', error);
+    return NextResponse.json(
+      { success: false, message: 'Errore interno del server.' },
+      { status: 500 }
+    );
+  }
+});
+
+export const PATCH = withAuth(async (request: NextRequest, context) => {
+  try {
+    const { id } = await (context as { params: Promise<{ id: string }> }).params;
+    const numericId = Number(id);
+    const body = await request.json();
+
+    const [existingSlide] = await db
+      .select()
+      .from(schema.slides)
+      .where(eq(schema.slides.id, numericId))
+      .limit(1);
+
+    if (!existingSlide) {
+      return NextResponse.json(
+        { success: false, message: 'Diapositiva non trovata.' },
+        { status: 404 }
+      );
+    }
+
+    const allowedFields = [
+      'title', 'dateTaken', 'location',
+      'magazineId', 'slotNumber', 'notes', 'status',
+    ];
+
+    const updateData: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) {
+        updateData[field] = body[field];
+      }
+    }
+    updateData.updatedAt = new Date();
+
+    const [updatedSlide] = await db
+      .update(schema.slides)
+      .set(updateData)
+      .where(eq(schema.slides.id, numericId))
+      .returning();
+
+    return NextResponse.json({
+      success: true,
+      slide: updatedSlide,
+    });
+  } catch (error) {
+    console.error('Errore nell\'aggiornamento della diapositiva:', error);
+    return NextResponse.json(
+      { success: false, message: 'Errore interno del server.' },
+      { status: 500 }
+    );
+  }
+});
+
+export const DELETE = withAuth(async (request: NextRequest, context) => {
+  try {
+    const { id } = await (context as { params: Promise<{ id: string }> }).params;
+    const numericId = Number(id);
+
+    const [existingSlide] = await db
+      .select()
+      .from(schema.slides)
+      .where(eq(schema.slides.id, numericId))
+      .limit(1);
+
+    if (!existingSlide) {
+      return NextResponse.json(
+        { success: false, message: 'Diapositiva non trovata.' },
+        { status: 404 }
+      );
+    }
+
+    const [deletedSlide] = await db
+      .update(schema.slides)
+      .set({ status: 'deleted', updatedAt: new Date() })
+      .where(eq(schema.slides.id, numericId))
+      .returning();
+
+    return NextResponse.json({
+      success: true,
+      message: 'Diapositiva eliminata con successo.',
+      slide: deletedSlide,
+    });
+  } catch (error) {
+    console.error('Errore nell\'eliminazione della diapositiva:', error);
+    return NextResponse.json(
+      { success: false, message: 'Errore interno del server.' },
+      { status: 500 }
+    );
+  }
+});

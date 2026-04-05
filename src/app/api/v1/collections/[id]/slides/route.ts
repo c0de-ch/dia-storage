@@ -1,0 +1,148 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import * as schema from '@/lib/db/schema';
+import { withAuth } from '@/lib/auth/middleware';
+import { t } from '@/lib/i18n';
+import { eq, and } from 'drizzle-orm';
+
+export const POST = withAuth(async (request: NextRequest, context) => {
+  try {
+    const { id } = await (context as { params: Promise<{ id: string }> }).params;
+    const numericId = Number(id);
+    const body = await request.json();
+    const { slideIds } = body;
+
+    if (!slideIds || !Array.isArray(slideIds) || slideIds.length === 0) {
+      return NextResponse.json(
+        { success: false, message: 'Lista di ID diapositive obbligatoria.' },
+        { status: 400 }
+      );
+    }
+
+    const [collection] = await db
+      .select()
+      .from(schema.collections)
+      .where(eq(schema.collections.id, numericId))
+      .limit(1);
+
+    if (!collection) {
+      return NextResponse.json(
+        { success: false, message: 'Collezione non trovata.' },
+        { status: 404 }
+      );
+    }
+
+    let added = 0;
+    for (const slideId of slideIds) {
+      const numericSlideId = Number(slideId);
+
+      const [existingSlide] = await db
+        .select()
+        .from(schema.slides)
+        .where(eq(schema.slides.id, numericSlideId))
+        .limit(1);
+
+      if (!existingSlide) continue;
+
+      const [existingAssoc] = await db
+        .select()
+        .from(schema.slideCollections)
+        .where(
+          and(
+            eq(schema.slideCollections.collectionId, numericId),
+            eq(schema.slideCollections.slideId, numericSlideId)
+          )
+        )
+        .limit(1);
+
+      if (existingAssoc) continue;
+
+      await db.insert(schema.slideCollections).values({
+        collectionId: numericId,
+        slideId: numericSlideId,
+      });
+      added++;
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `${added} diapositive aggiunte alla collezione.`,
+      added,
+    });
+  } catch (error) {
+    console.error('Errore nell\'aggiunta delle diapositive alla collezione:', error);
+    return NextResponse.json(
+      { success: false, message: 'Errore interno del server.' },
+      { status: 500 }
+    );
+  }
+});
+
+export const DELETE = withAuth(async (request: NextRequest, context) => {
+  try {
+    const { id } = await (context as { params: Promise<{ id: string }> }).params;
+    const numericId = Number(id);
+    const { searchParams } = new URL(request.url);
+    const slideId = searchParams.get('slideId');
+
+    if (!slideId) {
+      return NextResponse.json(
+        { success: false, message: 'ID diapositiva obbligatorio.' },
+        { status: 400 }
+      );
+    }
+
+    const numericSlideId = Number(slideId);
+
+    const [collection] = await db
+      .select()
+      .from(schema.collections)
+      .where(eq(schema.collections.id, numericId))
+      .limit(1);
+
+    if (!collection) {
+      return NextResponse.json(
+        { success: false, message: 'Collezione non trovata.' },
+        { status: 404 }
+      );
+    }
+
+    const [existingAssoc] = await db
+      .select()
+      .from(schema.slideCollections)
+      .where(
+        and(
+          eq(schema.slideCollections.collectionId, numericId),
+          eq(schema.slideCollections.slideId, numericSlideId)
+        )
+      )
+      .limit(1);
+
+    if (!existingAssoc) {
+      return NextResponse.json(
+        { success: false, message: 'Diapositiva non presente in questa collezione.' },
+        { status: 404 }
+      );
+    }
+
+    await db
+      .delete(schema.slideCollections)
+      .where(
+        and(
+          eq(schema.slideCollections.collectionId, numericId),
+          eq(schema.slideCollections.slideId, numericSlideId)
+        )
+      );
+
+    return NextResponse.json({
+      success: true,
+      message: 'Diapositiva rimossa dalla collezione.',
+    });
+  } catch (error) {
+    console.error('Errore nella rimozione della diapositiva dalla collezione:', error);
+    return NextResponse.json(
+      { success: false, message: 'Errore interno del server.' },
+      { status: 500 }
+    );
+  }
+});

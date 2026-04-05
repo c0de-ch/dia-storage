@@ -1,0 +1,1010 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import {
+  Eye,
+  EyeOff,
+  Globe,
+  HardDrive,
+  Key,
+  Lock,
+  Mail,
+  MessageSquare,
+  Save,
+  Send,
+  Server,
+  Clock,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Progress,
+  ProgressLabel,
+  ProgressValue,
+} from "@/components/ui/progress";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type ConfigMap = Record<string, string | number | boolean>;
+
+// ---------------------------------------------------------------------------
+// Masked field component
+// ---------------------------------------------------------------------------
+
+function MaskedField({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="grid gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          id={id}
+          type={visible ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1"
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          type="button"
+          onClick={() => setVisible(!visible)}
+        >
+          {visible ? (
+            <EyeOff className="size-4" />
+          ) : (
+            <Eye className="size-4" />
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Save button
+// ---------------------------------------------------------------------------
+
+function SaveButton({
+  saving,
+  onClick,
+}: {
+  saving: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button onClick={onClick} disabled={saving} className="mt-4">
+      <Save className="size-4 mr-1.5" />
+      {saving ? "Salvataggio..." : "Salva impostazioni"}
+    </Button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
+
+export default function ImpostazioniPage() {
+  const [config, setConfig] = useState<ConfigMap>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const fetchConfig = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/config");
+      const data = await res.json();
+      if (data.success) {
+        setConfig(data.config ?? {});
+      }
+    } catch {
+      toast.error("Errore nel caricamento della configurazione.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConfig();
+  }, [fetchConfig]);
+
+  function updateField(key: string, value: string | number | boolean) {
+    setConfig((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function getStr(key: string, fallback = ""): string {
+    const v = config[key];
+    return v !== undefined && v !== null ? String(v) : fallback;
+  }
+
+  function getNum(key: string, fallback = 0): number {
+    const v = config[key];
+    if (typeof v === "number") return v;
+    const n = Number(v);
+    return isNaN(n) ? fallback : n;
+  }
+
+  function getBool(key: string, fallback = false): boolean {
+    const v = config[key];
+    if (typeof v === "boolean") return v;
+    if (v === "true") return true;
+    if (v === "false") return false;
+    return fallback;
+  }
+
+  async function saveConfig(fields: Record<string, string | number | boolean>) {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/v1/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message ?? "Errore nel salvataggio.");
+        return;
+      }
+      toast.success("Impostazioni salvate con successo.");
+    } catch {
+      toast.error("Errore di rete.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function testEndpoint(
+    url: string,
+    successMsg: string,
+    errorMsg: string
+  ) {
+    try {
+      const res = await fetch(url, { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(successMsg);
+      } else {
+        toast.error(data.message ?? errorMsg);
+      }
+    } catch {
+      toast.error(errorMsg);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p className="text-muted-foreground">Caricamento...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Impostazioni</h1>
+        <p className="text-muted-foreground">
+          Configura i parametri dell&apos;applicazione.
+        </p>
+      </div>
+
+      <Tabs defaultValue="generale">
+        <TabsList className="flex-wrap">
+          <TabsTrigger value="generale">
+            <Globe className="size-3.5 mr-1" />
+            Generale
+          </TabsTrigger>
+          <TabsTrigger value="autenticazione">
+            <Lock className="size-3.5 mr-1" />
+            Autenticazione
+          </TabsTrigger>
+          <TabsTrigger value="email">
+            <Mail className="size-3.5 mr-1" />
+            Email SMTP
+          </TabsTrigger>
+          <TabsTrigger value="whatsapp">
+            <MessageSquare className="size-3.5 mr-1" />
+            WhatsApp
+          </TabsTrigger>
+          <TabsTrigger value="archiviazione">
+            <HardDrive className="size-3.5 mr-1" />
+            Archiviazione
+          </TabsTrigger>
+          <TabsTrigger value="backup-s3">
+            <Server className="size-3.5 mr-1" />
+            Backup S3
+          </TabsTrigger>
+          <TabsTrigger value="backup-nas">
+            <HardDrive className="size-3.5 mr-1" />
+            Backup NAS
+          </TabsTrigger>
+          <TabsTrigger value="pianificazione">
+            <Clock className="size-3.5 mr-1" />
+            Pianificazione
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ---- Generale ---- */}
+        <TabsContent value="generale">
+          <Card>
+            <CardHeader>
+              <CardTitle>Impostazioni generali</CardTitle>
+              <CardDescription>
+                Configura i parametri base dell&apos;applicazione.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 max-w-lg">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="app-name">Nome applicazione</Label>
+                  <Input
+                    id="app-name"
+                    value={getStr("appName", "Dia-Storage")}
+                    onChange={(e) => updateField("appName", e.target.value)}
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="app-locale">Lingua</Label>
+                  <Input
+                    id="app-locale"
+                    value={getStr("locale", "it-IT")}
+                    onChange={(e) => updateField("locale", e.target.value)}
+                    placeholder="it-IT"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="app-timezone">Fuso orario</Label>
+                  <Input
+                    id="app-timezone"
+                    value={getStr("timezone", "Europe/Rome")}
+                    onChange={(e) => updateField("timezone", e.target.value)}
+                    placeholder="Europe/Rome"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="date-format">Formato data</Label>
+                  <Input
+                    id="date-format"
+                    value={getStr("dateFormat", "dd/MM/yyyy")}
+                    onChange={(e) => updateField("dateFormat", e.target.value)}
+                    placeholder="dd/MM/yyyy"
+                  />
+                </div>
+
+                <SaveButton
+                  saving={saving}
+                  onClick={() =>
+                    saveConfig({
+                      appName: getStr("appName", "Dia-Storage"),
+                      locale: getStr("locale", "it-IT"),
+                      timezone: getStr("timezone", "Europe/Rome"),
+                      dateFormat: getStr("dateFormat", "dd/MM/yyyy"),
+                    })
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ---- Autenticazione ---- */}
+        <TabsContent value="autenticazione">
+          <Card>
+            <CardHeader>
+              <CardTitle>Autenticazione</CardTitle>
+              <CardDescription>
+                Parametri di sessione e OTP.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 max-w-lg">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="session-duration">
+                    Durata sessione (giorni)
+                  </Label>
+                  <Input
+                    id="session-duration"
+                    type="number"
+                    min={1}
+                    value={getNum("sessionExpiryDays", 30)}
+                    onChange={(e) =>
+                      updateField("sessionExpiryDays", Number(e.target.value))
+                    }
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="otp-expiry">
+                    Scadenza OTP (minuti)
+                  </Label>
+                  <Input
+                    id="otp-expiry"
+                    type="number"
+                    min={1}
+                    value={getNum("otpExpiryMinutes", 10)}
+                    onChange={(e) =>
+                      updateField("otpExpiryMinutes", Number(e.target.value))
+                    }
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="otp-length">Lunghezza OTP</Label>
+                  <Input
+                    id="otp-length"
+                    type="number"
+                    min={4}
+                    max={8}
+                    value={getNum("otpLength", 6)}
+                    onChange={(e) =>
+                      updateField("otpLength", Number(e.target.value))
+                    }
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label>Canale OTP predefinito</Label>
+                  <Select
+                    value={getStr("defaultChannel", "email")}
+                    onValueChange={(v) => { if (v) updateField("defaultChannel", v); }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                      <SelectItem value="both">Entrambi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <SaveButton
+                  saving={saving}
+                  onClick={() =>
+                    saveConfig({
+                      sessionExpiryDays: getNum("sessionExpiryDays", 30),
+                      otpExpiryMinutes: getNum("otpExpiryMinutes", 10),
+                      otpLength: getNum("otpLength", 6),
+                      defaultChannel: getStr("defaultChannel", "email"),
+                    })
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ---- Email SMTP ---- */}
+        <TabsContent value="email">
+          <Card>
+            <CardHeader>
+              <CardTitle>Email SMTP</CardTitle>
+              <CardDescription>
+                Configurazione del server di posta in uscita.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 max-w-lg">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="smtp-host">Host SMTP</Label>
+                  <Input
+                    id="smtp-host"
+                    value={getStr("smtpHost")}
+                    onChange={(e) => updateField("smtpHost", e.target.value)}
+                    placeholder="smtp.esempio.it"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="smtp-port">Porta</Label>
+                  <Input
+                    id="smtp-port"
+                    type="number"
+                    value={getNum("smtpPort", 587)}
+                    onChange={(e) =>
+                      updateField("smtpPort", Number(e.target.value))
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="smtp-secure">Connessione sicura (TLS)</Label>
+                  <Switch
+                    id="smtp-secure"
+                    checked={getBool("smtpSecure")}
+                    onCheckedChange={(v) => updateField("smtpSecure", v)}
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="smtp-user">Utente</Label>
+                  <Input
+                    id="smtp-user"
+                    value={getStr("smtpUser")}
+                    onChange={(e) => updateField("smtpUser", e.target.value)}
+                    placeholder="utente@esempio.it"
+                  />
+                </div>
+
+                <MaskedField
+                  id="smtp-password"
+                  label="Password"
+                  value={getStr("smtpPassword")}
+                  onChange={(v) => updateField("smtpPassword", v)}
+                  placeholder="Password SMTP"
+                />
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="smtp-from-name">Nome mittente</Label>
+                  <Input
+                    id="smtp-from-name"
+                    value={getStr("smtpFromName", "Dia-Storage")}
+                    onChange={(e) =>
+                      updateField("smtpFromName", e.target.value)
+                    }
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="smtp-from-address">
+                    Indirizzo mittente
+                  </Label>
+                  <Input
+                    id="smtp-from-address"
+                    type="email"
+                    value={getStr("smtpFromAddress")}
+                    onChange={(e) =>
+                      updateField("smtpFromAddress", e.target.value)
+                    }
+                    placeholder="noreply@esempio.it"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <SaveButton
+                    saving={saving}
+                    onClick={() =>
+                      saveConfig({
+                        smtpHost: getStr("smtpHost"),
+                        smtpPort: getNum("smtpPort", 587),
+                        smtpSecure: getBool("smtpSecure"),
+                        smtpUser: getStr("smtpUser"),
+                        smtpPassword: getStr("smtpPassword"),
+                        smtpFromName: getStr("smtpFromName", "Dia-Storage"),
+                        smtpFromAddress: getStr("smtpFromAddress"),
+                      })
+                    }
+                  />
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() =>
+                      testEndpoint(
+                        "/api/v1/config/test-email",
+                        "Email di prova inviata con successo.",
+                        "Errore nell'invio dell'email di prova."
+                      )
+                    }
+                  >
+                    <Send className="size-4 mr-1.5" />
+                    Invia email di prova
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ---- WhatsApp ---- */}
+        <TabsContent value="whatsapp">
+          <Card>
+            <CardHeader>
+              <CardTitle>WhatsApp</CardTitle>
+              <CardDescription>
+                Configurazione invio OTP tramite WhatsApp Business API.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 max-w-lg">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="wa-enabled">Abilita WhatsApp</Label>
+                  <Switch
+                    id="wa-enabled"
+                    checked={getBool("whatsappEnabled")}
+                    onCheckedChange={(v) => updateField("whatsappEnabled", v)}
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="wa-phone-id">Phone Number ID</Label>
+                  <Input
+                    id="wa-phone-id"
+                    value={getStr("whatsappPhoneNumberId")}
+                    onChange={(e) =>
+                      updateField("whatsappPhoneNumberId", e.target.value)
+                    }
+                    placeholder="1234567890"
+                  />
+                </div>
+
+                <MaskedField
+                  id="wa-access-token"
+                  label="Access Token"
+                  value={getStr("whatsappAccessToken")}
+                  onChange={(v) => updateField("whatsappAccessToken", v)}
+                  placeholder="Token di accesso"
+                />
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="wa-template">Nome template</Label>
+                  <Input
+                    id="wa-template"
+                    value={getStr("whatsappTemplateName", "otp_login")}
+                    onChange={(e) =>
+                      updateField("whatsappTemplateName", e.target.value)
+                    }
+                    placeholder="otp_login"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <SaveButton
+                    saving={saving}
+                    onClick={() =>
+                      saveConfig({
+                        whatsappEnabled: getBool("whatsappEnabled"),
+                        whatsappPhoneNumberId: getStr("whatsappPhoneNumberId"),
+                        whatsappAccessToken: getStr("whatsappAccessToken"),
+                        whatsappTemplateName: getStr(
+                          "whatsappTemplateName",
+                          "otp_login"
+                        ),
+                      })
+                    }
+                  />
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() =>
+                      testEndpoint(
+                        "/api/v1/config/test-whatsapp",
+                        "Messaggio di prova inviato con successo.",
+                        "Errore nell'invio del messaggio di prova."
+                      )
+                    }
+                  >
+                    <Send className="size-4 mr-1.5" />
+                    Invia messaggio di prova
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ---- Archiviazione ---- */}
+        <TabsContent value="archiviazione">
+          <Card>
+            <CardHeader>
+              <CardTitle>Archiviazione</CardTitle>
+              <CardDescription>
+                Parametri di archiviazione delle diapositive.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 max-w-lg">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="storage-base-path">Percorso base</Label>
+                  <Input
+                    id="storage-base-path"
+                    value={getStr("storagePath", "/data")}
+                    onChange={(e) =>
+                      updateField("storagePath", e.target.value)
+                    }
+                    placeholder="/data"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="max-upload">
+                    Dimensione massima upload (MB):{" "}
+                    {getNum("maxUploadSizeMb", 100)}
+                  </Label>
+                  <input
+                    id="max-upload"
+                    type="range"
+                    min={10}
+                    max={500}
+                    step={10}
+                    value={getNum("maxUploadSizeMb", 100)}
+                    onChange={(e) =>
+                      updateField("maxUploadSizeMb", Number(e.target.value))
+                    }
+                    className="w-full accent-primary"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="thumb-width">
+                      Larghezza miniatura (px)
+                    </Label>
+                    <Input
+                      id="thumb-width"
+                      type="number"
+                      value={getNum("thumbnailWidth", 400)}
+                      onChange={(e) =>
+                        updateField("thumbnailWidth", Number(e.target.value))
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="thumb-quality">
+                      Qualit&agrave; miniatura (%)
+                    </Label>
+                    <Input
+                      id="thumb-quality"
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={getNum("thumbnailQuality", 80)}
+                      onChange={(e) =>
+                        updateField(
+                          "thumbnailQuality",
+                          Number(e.target.value)
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="medium-width">
+                      Larghezza media (px)
+                    </Label>
+                    <Input
+                      id="medium-width"
+                      type="number"
+                      value={getNum("mediumWidth", 1600)}
+                      onChange={(e) =>
+                        updateField("mediumWidth", Number(e.target.value))
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="medium-quality">
+                      Qualit&agrave; media (%)
+                    </Label>
+                    <Input
+                      id="medium-quality"
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={getNum("mediumQuality", 85)}
+                      onChange={(e) =>
+                        updateField("mediumQuality", Number(e.target.value))
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* Disk usage progress bar */}
+                <div className="pt-2">
+                  <Progress value={getNum("diskUsagePercent", 0)}>
+                    <ProgressLabel>Utilizzo disco</ProgressLabel>
+                    <ProgressValue />
+                  </Progress>
+                </div>
+
+                <SaveButton
+                  saving={saving}
+                  onClick={() =>
+                    saveConfig({
+                      storagePath: getStr("storagePath", "/data"),
+                      maxUploadSizeMb: getNum("maxUploadSizeMb", 100),
+                      thumbnailWidth: getNum("thumbnailWidth", 400),
+                      thumbnailQuality: getNum("thumbnailQuality", 80),
+                      mediumWidth: getNum("mediumWidth", 1600),
+                      mediumQuality: getNum("mediumQuality", 85),
+                    })
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ---- Backup S3 ---- */}
+        <TabsContent value="backup-s3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Backup S3</CardTitle>
+              <CardDescription>
+                Configurazione del backup su storage compatibile S3.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 max-w-lg">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="s3-enabled">Abilita backup S3</Label>
+                  <Switch
+                    id="s3-enabled"
+                    checked={getBool("s3Enabled")}
+                    onCheckedChange={(v) => updateField("s3Enabled", v)}
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="s3-endpoint">Endpoint</Label>
+                  <Input
+                    id="s3-endpoint"
+                    value={getStr("s3Endpoint")}
+                    onChange={(e) =>
+                      updateField("s3Endpoint", e.target.value)
+                    }
+                    placeholder="https://s3.amazonaws.com"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="s3-bucket">Bucket</Label>
+                  <Input
+                    id="s3-bucket"
+                    value={getStr("s3Bucket")}
+                    onChange={(e) =>
+                      updateField("s3Bucket", e.target.value)
+                    }
+                    placeholder="dia-storage-backup"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="s3-region">Regione</Label>
+                  <Input
+                    id="s3-region"
+                    value={getStr("s3Region", "eu-south-1")}
+                    onChange={(e) =>
+                      updateField("s3Region", e.target.value)
+                    }
+                    placeholder="eu-south-1"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="s3-access-key">Access Key</Label>
+                  <Input
+                    id="s3-access-key"
+                    value={getStr("s3AccessKey")}
+                    onChange={(e) =>
+                      updateField("s3AccessKey", e.target.value)
+                    }
+                    placeholder="AKIAIOSFODNN7EXAMPLE"
+                  />
+                </div>
+
+                <MaskedField
+                  id="s3-secret-key"
+                  label="Secret Key"
+                  value={getStr("s3SecretKey")}
+                  onChange={(v) => updateField("s3SecretKey", v)}
+                  placeholder="Chiave segreta"
+                />
+
+                <div className="flex items-center gap-2">
+                  <SaveButton
+                    saving={saving}
+                    onClick={() =>
+                      saveConfig({
+                        s3Enabled: getBool("s3Enabled"),
+                        s3Endpoint: getStr("s3Endpoint"),
+                        s3Bucket: getStr("s3Bucket"),
+                        s3Region: getStr("s3Region", "eu-south-1"),
+                        s3AccessKey: getStr("s3AccessKey"),
+                        s3SecretKey: getStr("s3SecretKey"),
+                      })
+                    }
+                  />
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() =>
+                      testEndpoint(
+                        "/api/v1/config/test-s3",
+                        "Connessione S3 verificata con successo.",
+                        "Errore nella connessione S3."
+                      )
+                    }
+                  >
+                    <CheckCircle2 className="size-4 mr-1.5" />
+                    Verifica connessione
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ---- Backup NAS ---- */}
+        <TabsContent value="backup-nas">
+          <Card>
+            <CardHeader>
+              <CardTitle>Backup NAS</CardTitle>
+              <CardDescription>
+                Configurazione del backup su NAS locale.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 max-w-lg">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="nas-enabled">Abilita backup NAS</Label>
+                  <Switch
+                    id="nas-enabled"
+                    checked={getBool("nasEnabled")}
+                    onCheckedChange={(v) => updateField("nasEnabled", v)}
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="nas-mount-path">Percorso di mount</Label>
+                  <Input
+                    id="nas-mount-path"
+                    value={getStr("nasMountPath")}
+                    onChange={(e) =>
+                      updateField("nasMountPath", e.target.value)
+                    }
+                    placeholder="/mnt/nas/backup"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <SaveButton
+                    saving={saving}
+                    onClick={() =>
+                      saveConfig({
+                        nasEnabled: getBool("nasEnabled"),
+                        nasMountPath: getStr("nasMountPath"),
+                      })
+                    }
+                  />
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch("/api/v1/config/test-nas", {
+                          method: "POST",
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.success) {
+                          toast.success(
+                            "Verifica scrittura NAS riuscita."
+                          );
+                        } else {
+                          toast.error(
+                            data.message ??
+                              "Errore nella verifica scrittura NAS."
+                          );
+                        }
+                      } catch {
+                        toast.error("Errore nella verifica scrittura NAS.");
+                      }
+                    }}
+                  >
+                    <Key className="size-4 mr-1.5" />
+                    Verifica scrittura
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ---- Pianificazione ---- */}
+        <TabsContent value="pianificazione">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pianificazione backup</CardTitle>
+              <CardDescription>
+                Configura l&apos;esecuzione automatica dei backup.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 max-w-lg">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="schedule-enabled">
+                    Abilita pianificazione
+                  </Label>
+                  <Switch
+                    id="schedule-enabled"
+                    checked={getBool("scheduleEnabled")}
+                    onCheckedChange={(v) => updateField("scheduleEnabled", v)}
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="cron-expression">
+                    Espressione cron
+                  </Label>
+                  <Input
+                    id="cron-expression"
+                    value={getStr("cronExpression", "0 2 * * *")}
+                    onChange={(e) =>
+                      updateField("cronExpression", e.target.value)
+                    }
+                    placeholder="0 2 * * *"
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Formato: minuto ora giorno mese giorno_settimana
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-sm text-muted-foreground">
+                    Prossima esecuzione prevista:
+                  </p>
+                  <p className="font-medium">
+                    {getBool("scheduleEnabled")
+                      ? "Calcolata in base all'espressione cron configurata"
+                      : "Pianificazione disattivata"}
+                  </p>
+                </div>
+
+                <SaveButton
+                  saving={saving}
+                  onClick={() =>
+                    saveConfig({
+                      scheduleEnabled: getBool("scheduleEnabled"),
+                      cronExpression: getStr("cronExpression", "0 2 * * *"),
+                    })
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

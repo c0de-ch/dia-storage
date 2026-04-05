@@ -1,0 +1,143 @@
+# =============================================================================
+# Dia-Storage - Configurazione
+# =============================================================================
+# Copia questo file in config.yaml e personalizza i valori.
+# Le variabili d'ambiente con prefisso DIA_ sovrascrivono questi valori.
+# Esempio: DIA_APP__NAME sovrascrive app.name
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Applicazione
+# ---------------------------------------------------------------------------
+app:
+  name: "Dia-Storage"
+  url: "http://localhost:3000"
+  port: 3000
+  timezone: "Europe/Rome"
+  # Livello di log: debug, info, warn, error
+  logLevel: "info"
+
+# ---------------------------------------------------------------------------
+# Autenticazione (OTP senza password)
+# ---------------------------------------------------------------------------
+auth:
+  # Lunghezza del codice OTP (4-8 cifre)
+  otpLength: 6
+  # Scadenza OTP in minuti
+  otpExpiryMinutes: 10
+  # Durata sessione in giorni
+  sessionExpiryDays: 30
+  # Tentativi massimi OTP prima del blocco
+  maxOtpAttempts: 5
+  # Cooldown tra invii OTP in secondi
+  otpCooldownSeconds: 60
+  # Domini email consentiti (vuoto = tutti)
+  # allowedDomains:
+  #   - "example.com"
+  # Canale predefinito: email, whatsapp, both
+  defaultChannel: "email"
+
+# ---------------------------------------------------------------------------
+# Email (SMTP)
+# ---------------------------------------------------------------------------
+email:
+  host: "smtp.example.com"
+  port: 587
+  secure: false
+  user: ""
+  password: ""
+  from: "noreply@example.com"
+  fromName: "Dia-Storage"
+
+# ---------------------------------------------------------------------------
+# WhatsApp Business Cloud API (opzionale)
+# ---------------------------------------------------------------------------
+whatsapp:
+  enabled: false
+  apiUrl: "https://graph.facebook.com/v21.0"
+  phoneNumberId: ""
+  accessToken: ""
+  templateName: "otp_login"
+  templateLanguage: "it"
+
+# ---------------------------------------------------------------------------
+# Archiviazione file
+# ---------------------------------------------------------------------------
+storage:
+  # Percorso base per tutti i file
+  basePath: "/data"
+  # Sottocartelle
+  incomingDir: "incoming"
+  originalsDir: "originals"
+  thumbnailsDir: "thumbnails"
+  mediumDir: "medium"
+  # Miniature
+  thumbnailWidth: 400
+  thumbnailQuality: 80
+  # Immagini medie
+  mediumWidth: 1600
+  mediumQuality: 85
+  # Dimensione massima upload in MB
+  maxUploadSizeMb: 100
+  # Estensioni consentite
+  allowedExtensions:
+    - ".jpg"
+    - ".jpeg"
+    - ".tif"
+    - ".tiff"
+    - ".png"
+
+# ---------------------------------------------------------------------------
+# Database PostgreSQL
+# ---------------------------------------------------------------------------
+database:
+  url: "postgres://dia:dia@localhost:5432/dia_storage"
+  maxConnections: 10
+  idleTimeout: 20
+
+# ---------------------------------------------------------------------------
+# Backup
+# ---------------------------------------------------------------------------
+backup:
+  enabled: false
+  # Pianificazione cron (default: ogni notte alle 2:00)
+  schedule: "0 2 * * *"
+  # Giorni di conservazione log backup
+  retainDays: 90
+  # Includi dump database nel backup
+  includeDatabase: true
+  # Destinazioni backup (possono essere multiple)
+  destinations:
+    # Esempio S3 / MinIO
+    # - type: "s3"
+    #   bucket: "dia-backup"
+    #   region: "eu-central-1"
+    #   endpoint: "https://s3.example.com"
+    #   accessKeyId: ""
+    #   secretAccessKey: ""
+
+    # Esempio directory locale / NAS montato
+    # - type: "local"
+    #   path: "/mnt/nas/dia-backup"
+
+    # Esempio condivisione SMB/CIFS
+    # - type: "smb"
+    #   host: "192.168.1.100"
+    #   share: "backup"
+    #   path: "dia-storage"
+    #   username: ""
+    #   password: ""
+
+    # Esempio rsync via SSH
+    # - type: "rsync"
+    #   path: "user@backup-server:/backup/dia-storage"
+
+# ---------------------------------------------------------------------------
+# Assistenza remota (opzionale)
+# ---------------------------------------------------------------------------
+remoteHelp:
+  enabled: false
+  # Provider: rustdesk, tailscale, none
+  provider: "none"
+  # rustdeskId: ""
+  # tailscaleAuthKey: ""

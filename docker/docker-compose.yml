@@ -1,0 +1,53 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - app-data:/app/data
+      - app-config:/app/config
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://dia:dia@db:5432/dia_storage
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=dia
+      - POSTGRES_PASSWORD=dia
+      - POSTGRES_DB=dia_storage
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dia -d dia_storage"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  app-data:
+  app-config:
+  db-data:
+  caddy-data:
+  caddy-config:
