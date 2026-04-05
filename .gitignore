@@ -1,0 +1,57 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# testing
+coverage/
+
+# next.js
+.next/
+out/
+
+# production
+build/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# config with secrets
+config.yaml
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# data storage
+data/
+
+# uploads temp
+uploads/
+
+# macOS
+macos/DiaUploader.xcodeproj/xcuserdata/
+macos/DiaUploader.xcodeproj/project.xcworkspace/xcuserdata/
+macos/.build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
