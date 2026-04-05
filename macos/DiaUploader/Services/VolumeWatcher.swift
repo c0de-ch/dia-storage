@@ -139,14 +139,15 @@ final class VolumeWatcher: ObservableObject {
     func ejectVolume(named volumeName: String) {
         let volumeURL = URL(fileURLWithPath: "/Volumes/\(volumeName)")
 
-        NSWorkspace.shared.unmountAndEjectDevice(at: volumeURL) { error in
-            if let error = error {
+        Task {
+            do {
+                try await NSWorkspace.shared.unmountAndEjectDevice(at: volumeURL)
+                print("[VolumeWatcher] Volume espulso con successo: \(volumeName)")
+            } catch {
                 print("[VolumeWatcher] Errore nell'espulsione del volume: \(error)")
-                DispatchQueue.main.async { [weak self] in
+                await MainActor.run { [weak self] in
                     self?.appState?.error = "Errore nell'espulsione della scheda SD: \(error.localizedDescription)"
                 }
-            } else {
-                print("[VolumeWatcher] Volume espulso con successo: \(volumeName)")
             }
         }
     }
