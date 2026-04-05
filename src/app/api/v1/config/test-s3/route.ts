@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import * as schema from '@/lib/db/schema';
 import { withAdmin } from '@/lib/auth/middleware';
 import { S3Client, type S3ClientConfig, ListBucketsCommand } from '@aws-sdk/client-s3';
 
