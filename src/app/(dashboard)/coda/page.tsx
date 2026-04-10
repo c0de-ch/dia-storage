@@ -152,6 +152,7 @@ function BatchCard({
                   src={slide.thumbnailUrl}
                   alt={slide.originalFilename ?? "Diapositiva"}
                   className="size-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                 />
               ) : (
                 <div className="flex size-full items-center justify-center">
@@ -290,7 +291,7 @@ export default function CodaPage() {
           slides: Array.isArray(b.slides)
             ? b.slides.map((s: Record<string, unknown>) => ({
                 id: String(s.id ?? ""),
-                thumbnailUrl: s.thumbnailPath
+                thumbnailUrl: s.id
                   ? `/api/v1/slides/${s.id}/thumbnail`
                   : undefined,
                 originalFilename: s.originalFilename as string | undefined,

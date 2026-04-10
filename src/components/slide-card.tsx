@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ImageIcon } from "lucide-react";
 import type { Slide } from "@/types/slide";
 
 interface SlideCardProps {
@@ -84,20 +86,8 @@ export function SlideCard({
       )}
 
       {/* Thumbnail */}
-      <div className="relative aspect-[3/2] w-full overflow-hidden bg-muted">
-        <img
-          src={`/api/v1/slides/${slide.id}/thumbnail`}
-          alt={displayTitle}
-          className="h-full w-full object-cover transition-transform group-hover/slide:scale-105"
-          loading="lazy"
-        />
-        {/* Title overlay at bottom of image */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pb-1.5 pt-4">
-          <p className="truncate text-xs font-medium text-white">
-            {displayTitle}
-          </p>
-        </div>
-      </div>
+      <ThumbnailImage slideId={slide.id} alt={displayTitle} />
+
 
       {/* Info below thumbnail */}
       <div className="space-y-0.5 px-2 py-1.5">
@@ -116,6 +106,34 @@ export function SlideCard({
             Nessun dettaglio
           </p>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ThumbnailImage({ slideId, alt }: { slideId: number; alt: string }) {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div className="relative aspect-[3/2] w-full overflow-hidden bg-muted">
+      {failed ? (
+        <div className="flex h-full w-full items-center justify-center">
+          <ImageIcon className="size-8 text-muted-foreground" />
+        </div>
+      ) : (
+        <img
+          src={`/api/v1/slides/${slideId}/thumbnail`}
+          alt={alt}
+          className="h-full w-full object-cover transition-transform group-hover/slide:scale-105"
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      )}
+      {/* Title overlay at bottom of image */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pb-1.5 pt-4">
+        <p className="truncate text-xs font-medium text-white">
+          {alt}
+        </p>
       </div>
     </div>
   );

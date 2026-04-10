@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  ImageIcon,
   Loader2Icon,
   Trash2Icon,
 } from "lucide-react";
@@ -307,12 +308,7 @@ export default function SlideDetailPage() {
                       : "border-transparent hover:border-muted-foreground/30"
                   }`}
                 >
-                  <img
-                    src={`/api/v1/slides/${sib.id}/thumbnail`}
-                    alt={sib.title || sib.originalFilename || `#${sib.id}`}
-                    className="h-16 w-24 object-cover"
-                    loading="lazy"
-                  />
+                  <SiblingThumb id={sib.id} alt={sib.title || sib.originalFilename || `#${sib.id}`} />
                 </button>
               ))}
             </div>
@@ -321,5 +317,25 @@ export default function SlideDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function SiblingThumb({ id, alt }: { id: number; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <div className="flex h-16 w-24 items-center justify-center bg-muted">
+        <ImageIcon className="size-4 text-muted-foreground" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={`/api/v1/slides/${id}/thumbnail`}
+      alt={alt}
+      className="h-16 w-24 object-cover"
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
   );
 }
