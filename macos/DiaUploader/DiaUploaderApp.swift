@@ -5,6 +5,7 @@ struct DiaUploaderApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var volumeWatcher = VolumeWatcher()
     @StateObject private var uploadService = UploadService()
+    @State private var hasInitialized = false
 
     init() {
         // Wire up after all @StateObject are initialized
@@ -16,9 +17,11 @@ struct DiaUploaderApp: App {
                 .environmentObject(appState)
                 .environmentObject(volumeWatcher)
                 .environmentObject(uploadService)
-                .onAppear {
+                .task {
+                    guard !hasInitialized else { return }
+                    hasInitialized = true
                     setupVolumeWatcher()
-                    checkInitialConnection()
+                    await checkInitialConnection()
                 }
         } label: {
             Label("Dia-Uploader", systemImage: appState.isUploading ? "arrow.up.circle.fill" : "film")
@@ -50,21 +53,19 @@ struct DiaUploaderApp: App {
         volumeWatcher.checkExistingVolumes()
     }
 
-    private func checkInitialConnection() {
+    private func checkInitialConnection() async {
         guard !appState.serverURL.isEmpty, !appState.apiKey.isEmpty else { return }
-        Task {
-            do {
-                let connected = try await uploadService.testConnection(
-                    serverURL: appState.serverURL,
-                    apiKey: appState.apiKey
-                )
-                await MainActor.run {
-                    appState.isConnected = connected
-                }
-            } catch {
-                await MainActor.run {
-                    appState.isConnected = false
-                }
+        do {
+            let connected = try await uploadService.testConnection(
+                serverURL: appState.serverURL,
+                apiKey: appState.apiKey
+            )
+            await MainActor.run {
+                appState.isConnected = connected
+            }
+        } catch {
+            await MainActor.run {
+                appState.isConnected = false
             }
         }
     }

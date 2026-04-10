@@ -55,6 +55,15 @@ struct SettingsView: View {
                         }
                     }
 
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(appState.isConnected ? Color.green : Color.red)
+                            .frame(width: 8, height: 8)
+                        Text(appState.isConnected ? "Connesso" : "Disconnesso")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
                     HStack {
                         Button(action: testConnection) {
                             HStack(spacing: 4) {
@@ -170,6 +179,7 @@ struct SettingsView: View {
                     apiKey: apiKey
                 )
                 await MainActor.run {
+                    appState.isConnected = healthy
                     if healthy {
                         testResult = .success("Connessione riuscita!")
                     } else {
@@ -179,6 +189,7 @@ struct SettingsView: View {
                 }
             } catch {
                 await MainActor.run {
+                    appState.isConnected = false
                     testResult = .failure(error.localizedDescription)
                     isTesting = false
                 }
