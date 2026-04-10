@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { writeFileSync, unlinkSync, mkdtempSync } from "node:fs";
+import { writeFileSync, unlinkSync, mkdtempSync, readdirSync, rmdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { computeChecksum, computeChecksumFromBuffer } from "@/lib/images/checksum";
@@ -59,11 +59,9 @@ describe("computeChecksum", () => {
   afterAll(() => {
     // Clean up temp files created during tests
     try {
-      const { readdirSync } = require("node:fs");
       for (const f of readdirSync(tmpDir)) {
         unlinkSync(join(tmpDir, f));
       }
-      const { rmdirSync } = require("node:fs");
       rmdirSync(tmpDir);
     } catch {
       // Best effort cleanup
