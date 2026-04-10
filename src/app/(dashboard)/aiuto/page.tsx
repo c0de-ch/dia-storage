@@ -5,9 +5,14 @@ import { toast } from "sonner";
 import {
   BookOpenIcon,
   CircleHelp,
+  DownloadIcon,
+  ExternalLinkIcon,
   Headset,
+  LaptopIcon,
   Mail,
   Phone,
+  Volume2Icon,
+  VolumeXIcon,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -28,14 +33,27 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { useSpeechSynthesis } from "@/hooks/use-speech-synthesis";
 
 // ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
+const DIA_UPLOADER_DOWNLOAD_URL =
+  "https://github.com/c0de-ch/dia-storage/releases/latest/download/DiaUploader-macOS.zip";
+
+const DIA_UPLOADER_INSTRUCTIONS = `Per installare l'applicazione Dia-Uploader sul tuo Mac, segui questi passaggi.
+Primo: clicca sul pulsante Scarica per scaricare il file zip.
+Secondo: apri il file zip scaricato, troverai l'applicazione Dia-Uploader.
+Terzo: trascina l'applicazione nella cartella Applicazioni.
+Quarto: al primo avvio, fai clic destro sull'applicazione e seleziona Apri per autorizzarla.
+Quinto: inserisci l'indirizzo del server Dia-Storage e la tua chiave API nelle impostazioni dell'app.
+Sesto: inserisci la scheda SD dello scanner nel Mac. L'app rileverà automaticamente le nuove immagini e le caricherà.`;
+
 export default function AiutoPage() {
   const [remoteConnected, setRemoteConnected] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const { speak, cancel, isSpeaking, isSupported: ttsSupported } = useSpeechSynthesis();
 
   const checkStatus = useCallback(async () => {
     try {
@@ -128,6 +146,92 @@ export default function AiutoPage() {
               ? "Invio richiesta..."
               : "Richiedi assistenza remota"}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Dia-Uploader macOS app */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <LaptopIcon className="size-5" />
+            Dia-Uploader per macOS
+          </CardTitle>
+          <CardDescription>
+            Applicazione per importare automaticamente le diapositive dalla
+            scheda SD dello scanner al server Dia-Storage.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-3">
+            <Button render={<a href={DIA_UPLOADER_DOWNLOAD_URL} />}>
+              <DownloadIcon className="size-4 mr-2" />
+              Scarica Dia-Uploader
+            </Button>
+            <Button variant="outline" render={<a href="dia-uploader://open" />}>
+              <ExternalLinkIcon className="size-4 mr-2" />
+              Apri Dia-Uploader
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold">
+                Istruzioni di installazione
+              </h3>
+              {ttsSupported && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 text-xs"
+                  onClick={() => {
+                    if (isSpeaking) {
+                      cancel();
+                    } else {
+                      speak(DIA_UPLOADER_INSTRUCTIONS);
+                    }
+                  }}
+                >
+                  {isSpeaking ? (
+                    <VolumeXIcon className="size-3.5" />
+                  ) : (
+                    <Volume2Icon className="size-3.5" />
+                  )}
+                  {isSpeaking ? "Ferma" : "Ascolta"}
+                </Button>
+              )}
+            </div>
+            <ol className="list-decimal pl-5 space-y-2 text-sm text-muted-foreground">
+              <li>
+                Clicca su <strong>Scarica Dia-Uploader</strong> per scaricare il
+                file <code>DiaUploader-macOS.zip</code>.
+              </li>
+              <li>
+                Apri il file zip scaricato. Troverai l&apos;applicazione{" "}
+                <strong>DiaUploader.app</strong>.
+              </li>
+              <li>
+                Trascina <strong>DiaUploader.app</strong> nella cartella{" "}
+                <strong>Applicazioni</strong>.
+              </li>
+              <li>
+                Al primo avvio, fai clic destro sull&apos;applicazione e
+                seleziona <strong>Apri</strong> per autorizzarla (necessario
+                solo la prima volta).
+              </li>
+              <li>
+                Nelle impostazioni dell&apos;app, inserisci l&apos;indirizzo del
+                server Dia-Storage e la tua <strong>chiave API</strong>{" "}
+                (generabile da Amministrazione &gt; Chiavi API).
+              </li>
+              <li>
+                Inserisci la scheda SD dello scanner nel Mac. L&apos;app
+                rileverà automaticamente le nuove immagini e le caricherà su
+                Dia-Storage.
+              </li>
+            </ol>
+          </div>
         </CardContent>
       </Card>
 

@@ -24,6 +24,7 @@ struct DiaUploaderApp: App {
             Label("Dia-Uploader", systemImage: appState.isUploading ? "arrow.up.circle.fill" : "film")
         }
         .menuBarExtraStyle(.window)
+        .handlesExternalEvents(matching: ["dia-uploader"])
 
         Settings {
             SettingsView()

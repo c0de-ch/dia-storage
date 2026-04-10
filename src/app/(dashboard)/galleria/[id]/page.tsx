@@ -33,6 +33,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ImageViewer } from "@/components/image-viewer";
 import { MetadataForm } from "@/components/metadata-form";
+import { ExifPanel } from "@/components/exif-panel";
 import type { Slide } from "@/types/slide";
 
 export default function SlideDetailPage() {
@@ -231,6 +232,18 @@ export default function SlideDetailPage() {
               notes: slide.notes ?? "",
             }}
             onExifWrite={handleExifWrite}
+          />
+
+          {/* EXIF info */}
+          <ExifPanel
+            exifData={slide.exifData}
+            fileSize={slide.fileSize}
+            width={slide.width}
+            height={slide.height}
+            originalFilename={slide.originalFilename}
+            checksum={slide.checksum}
+            scanDate={slide.scanDate}
+            createdAt={slide.createdAt}
           />
 
           {/* Delete */}
