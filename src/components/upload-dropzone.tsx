@@ -27,14 +27,17 @@ export function UploadDropzone({
   const handleFiles = useCallback(
     (fileList: FileList | null) => {
       if (!fileList) return;
-      const jpegs = Array.from(fileList).filter(
-        (f) =>
-          f.type === "image/jpeg" ||
-          f.name.toLowerCase().endsWith(".jpg") ||
-          f.name.toLowerCase().endsWith(".jpeg")
-      );
-      if (jpegs.length > 0) {
-        onFilesSelected(jpegs);
+      const allowedExts = [
+        ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".webp",
+        ".gif", ".heic", ".heif", ".bmp", ".avif",
+        ".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm",
+      ];
+      const mediaFiles = Array.from(fileList).filter((f) => {
+        const name = f.name.toLowerCase();
+        return allowedExts.some((ext) => name.endsWith(ext));
+      });
+      if (mediaFiles.length > 0) {
+        onFilesSelected(mediaFiles);
       }
     },
     [onFilesSelected]
@@ -108,7 +111,7 @@ export function UploadDropzone({
             : t("upload.dropzone")}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          {t("upload.allowedFormats", { formats: "JPEG" })}
+          {t("upload.allowedFormats", { formats: "JPEG, PNG, GIF, HEIC, TIFF, WebP, MP4, MOV" })}
         </p>
       </div>
       <Button variant="outline" size="sm" disabled={disabled} type="button">
@@ -118,7 +121,7 @@ export function UploadDropzone({
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,.jpg,.jpeg"
+        accept="image/*,video/*,.heic,.heif,.avif"
         multiple
         className="hidden"
         onChange={handleInputChange}

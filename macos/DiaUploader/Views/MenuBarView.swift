@@ -200,12 +200,9 @@ struct MenuBarView: View {
     }
 
     private func openSettings() {
+        // Activate the app first — essential for MenuBarExtra apps
+        NSApp.activate(ignoringOtherApps: true)
+        // showSettingsWindow: available since macOS 13
         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        // Fallback for older macOS versions
-        if #available(macOS 14.0, *) {
-            // handled above
-        } else {
-            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-        }
     }
 }

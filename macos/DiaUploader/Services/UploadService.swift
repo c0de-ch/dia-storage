@@ -182,10 +182,11 @@ final class UploadService: ObservableObject {
         let fileName = file.lastPathComponent
 
         // Build multipart body
+        let mimeType = Self.mimeType(for: file.pathExtension)
         var body = Data()
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"files\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
         body.append(fileData)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
 
@@ -217,6 +218,27 @@ final class UploadService: ObservableObject {
             base = String(base.dropLast())
         }
         return URL(string: base + path)!
+    }
+
+    private static func mimeType(for ext: String) -> String {
+        switch ext.lowercased() {
+        case "jpg", "jpeg": return "image/jpeg"
+        case "png": return "image/png"
+        case "gif": return "image/gif"
+        case "webp": return "image/webp"
+        case "tiff", "tif": return "image/tiff"
+        case "heic": return "image/heic"
+        case "heif": return "image/heif"
+        case "bmp": return "image/bmp"
+        case "avif": return "image/avif"
+        case "mp4": return "video/mp4"
+        case "mov": return "video/quicktime"
+        case "m4v": return "video/x-m4v"
+        case "avi": return "video/x-msvideo"
+        case "mkv": return "video/x-matroska"
+        case "webm": return "video/webm"
+        default: return "application/octet-stream"
+        }
     }
 
     private func makeURLSession() -> URLSession {

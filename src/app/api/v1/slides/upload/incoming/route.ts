@@ -27,12 +27,17 @@ export const POST = withApiKey(async (request: NextRequest) => {
     const results = [];
 
     for (const file of files) {
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/tiff', 'image/webp'];
-      if (!allowedTypes.includes(file.type)) {
+      const imageExts = ['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.webp', '.gif', '.heic', '.heif', '.bmp', '.avif'];
+      const videoExts = ['.mp4', '.mov', '.m4v', '.avi', '.mkv', '.webm'];
+      const fileExt = path.extname(file.name).toLowerCase();
+      const isImage = imageExts.includes(fileExt);
+      const isVideo = videoExts.includes(fileExt);
+
+      if (!isImage && !isVideo) {
         results.push({
           filename: file.name,
           success: false,
-          message: `Tipo di file non supportato: ${file.type}. Tipi ammessi: JPEG, PNG, TIFF, WebP.`,
+          message: `Tipo di file non supportato: ${file.name}`,
         });
         continue;
       }
@@ -45,27 +50,44 @@ export const POST = withApiKey(async (request: NextRequest) => {
       const mediumDir = path.join(UPLOAD_DIR, 'medium', slideId);
 
       await mkdir(originalDir, { recursive: true });
-      await mkdir(thumbnailDir, { recursive: true });
-      await mkdir(mediumDir, { recursive: true });
 
       const ext = path.extname(file.name) || '.jpg';
       const originalPath = path.join(originalDir, `original${ext}`);
-      const thumbnailPath = path.join(thumbnailDir, 'thumbnail.jpg');
-      const mediumPath = path.join(mediumDir, 'medium.jpg');
 
       await writeFile(originalPath, buffer);
 
-      await sharp(buffer)
-        .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 80 })
-        .toFile(thumbnailPath);
+      let thumbnailPath: string | null = null;
+      let mediumPath: string | null = null;
+      let width: number | null = null;
+      let height: number | null = null;
 
-      await sharp(buffer)
-        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 85 })
-        .toFile(mediumPath);
+      if (isImage) {
+        try {
+          await mkdir(thumbnailDir, { recursive: true });
+          await mkdir(mediumDir, { recursive: true });
 
-      const metadata = await sharp(buffer).metadata();
+          thumbnailPath = path.join(thumbnailDir, 'thumbnail.jpg');
+          mediumPath = path.join(mediumDir, 'medium.jpg');
+
+          await sharp(buffer)
+            .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 80 })
+            .toFile(thumbnailPath);
+
+          await sharp(buffer)
+            .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 85 })
+            .toFile(mediumPath);
+
+          const metadata = await sharp(buffer).metadata();
+          width = metadata.width || null;
+          height = metadata.height || null;
+        } catch (imgErr) {
+          console.error(`Errore nell'elaborazione immagine ${file.name}:`, imgErr);
+          thumbnailPath = null;
+          mediumPath = null;
+        }
+      }
 
       const [slide] = await db
         .insert(schema.slides)
@@ -76,8 +98,8 @@ export const POST = withApiKey(async (request: NextRequest) => {
           thumbnailPath,
           mediumPath,
           fileSize: buffer.length,
-          width: metadata.width || null,
-          height: metadata.height || null,
+          width,
+          height,
           status: 'incoming',
           uploadedBy: user.id,
         })

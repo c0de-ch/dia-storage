@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Kodak-inspired warm gradient for the slide mount -->
+    <linearGradient id="mountGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFD54F"/>
+      <stop offset="100%" stop-color="#F9A825"/>
+    </linearGradient>
+    <!-- Film transparency gradient -->
+    <linearGradient id="filmGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1565C0"/>
+      <stop offset="40%" stop-color="#0D47A1"/>
+      <stop offset="100%" stop-color="#0A1929"/>
+    </linearGradient>
+    <!-- Subtle highlight on mount -->
+    <linearGradient id="highlight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.3)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+    <!-- Shadow filter -->
+    <filter id="innerShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
+      <feOffset dx="0" dy="4" result="offsetBlur"/>
+      <feFlood flood-color="#000" flood-opacity="0.4" result="color"/>
+      <feComposite in2="offsetBlur" operator="in" result="shadow"/>
+      <feComposite in="SourceGraphic" in2="shadow" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- macOS squircle background -->
+  <rect x="20" y="20" width="984" height="984" rx="220" ry="220" fill="url(#mountGrad)"/>
+  <!-- Subtle top highlight -->
+  <rect x="20" y="20" width="984" height="492" rx="220" ry="220" fill="url(#highlight)" opacity="0.5"/>
+
+  <!-- Slide mount texture - thin border lines suggesting cardboard -->
+  <rect x="60" y="60" width="904" height="904" rx="190" ry="190" fill="none" stroke="#E8A000" stroke-width="3" opacity="0.4"/>
+
+  <!-- Film aperture (the window in the slide mount) -->
+  <rect x="232" y="312" width="560" height="400" rx="16" ry="16" fill="#0A1929"/>
+  <!-- Film image area with blue tint suggesting a sky/landscape -->
+  <rect x="242" y="322" width="540" height="380" rx="10" ry="10" fill="url(#filmGrad)"/>
+
+  <!-- Stylized landscape silhouette inside the film -->
+  <!-- Mountains -->
+  <path d="M242 602 L362 462 L432 522 L532 402 L632 502 L782 422 L782 702 L242 702 Z" fill="#0D2137" opacity="0.8"/>
+  <path d="M242 632 L322 552 L402 592 L502 502 L602 562 L702 492 L782 532 L782 702 L242 702 Z" fill="#1A3A5C" opacity="0.7"/>
+  <!-- Sun/moon circle -->
+  <circle cx="652" cy="402" r="40" fill="#FFD54F" opacity="0.9"/>
+
+  <!-- Film sprocket holes - left side -->
+  <rect x="202" y="342" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+  <rect x="202" y="392" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+  <rect x="202" y="442" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+  <rect x="202" y="492" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+  <rect x="202" y="542" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+  <rect x="202" y="592" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+  <rect x="202" y="642" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+
+  <!-- Film sprocket holes - right side -->
+  <rect x="802" y="342" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+  <rect x="802" y="392" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+  <rect x="802" y="442" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+  <rect x="802" y="492" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+  <rect x="802" y="542" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+  <rect x="802" y="592" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+  <rect x="802" y="642" width="20" height="28" rx="4" fill="#1A1A2E" opacity="0.6"/>
+
+  <!-- Kodak-style red stripe at bottom of mount -->
+  <rect x="120" y="760" width="784" height="56" rx="8" fill="#D32F2F" opacity="0.85"/>
+  <!-- "DIA" text on the red stripe -->
+  <text x="512" y="800" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="bold" font-size="38" fill="#FFFFFF" letter-spacing="12">DIA</text>
+
+  <!-- Small dot markers on mount corners (typical of slide mounts) -->
+  <circle cx="140" cy="140" r="12" fill="#E8A000" opacity="0.5"/>
+  <circle cx="884" cy="140" r="12" fill="#E8A000" opacity="0.5"/>
+  <circle cx="140" cy="884" r="12" fill="#E8A000" opacity="0.5"/>
+  <circle cx="884" cy="884" r="12" fill="#E8A000" opacity="0.5"/>
+</svg>

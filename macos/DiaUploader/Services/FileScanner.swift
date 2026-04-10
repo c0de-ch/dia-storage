@@ -4,11 +4,31 @@ final class FileScanner {
     /// File name patterns to match (case-insensitive)
     private let patterns: [String] = [
         "PICT",
-        "IMG_"
+        "IMG_",
+        "DSC",
+        "MVI_",
+        "MOV_",
+        "VID_",
+        "VIDEO_",
+        "DSCF",
+        "P",
     ]
 
-    /// Allowed file extensions (lowercase)
-    private let allowedExtensions: Set<String> = ["jpg", "jpeg", "png", "tiff", "tif", "webp"]
+    /// Allowed image extensions (lowercase)
+    private let imageExtensions: Set<String> = [
+        "jpg", "jpeg", "png", "tiff", "tif", "webp",
+        "gif", "heic", "heif", "bmp", "avif",
+    ]
+
+    /// Allowed video extensions (lowercase)
+    private let videoExtensions: Set<String> = [
+        "mp4", "mov", "m4v", "avi", "mkv", "webm",
+    ]
+
+    /// All allowed extensions
+    private var allowedExtensions: Set<String> {
+        imageExtensions.union(videoExtensions)
+    }
 
     /// Subdirectories to scan in addition to root
     private let subdirectories: [String] = [
@@ -115,12 +135,17 @@ final class FileScanner {
     }
 
     private func matchesSlidePattern(_ fileURL: URL) -> Bool {
-        let filename = fileURL.lastPathComponent
         let ext = fileURL.pathExtension.lowercased()
-
         guard allowedExtensions.contains(ext) else { return false }
 
-        let nameWithoutExt = (filename as NSString).deletingPathExtension.uppercased()
+        // Accept any supported file inside a DCIM directory tree
+        if fileURL.path.uppercased().contains("/DCIM/") {
+            return true
+        }
+
+        // Outside DCIM, require a known camera/scanner prefix
+        let nameWithoutExt = (fileURL.lastPathComponent as NSString)
+            .deletingPathExtension.uppercased()
 
         for pattern in patterns {
             if nameWithoutExt.hasPrefix(pattern) {
