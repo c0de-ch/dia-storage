@@ -2,7 +2,7 @@
 
 import React, { useCallback, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
-import { UploadIcon, ImageIcon } from "lucide-react";
+import { UploadIcon, ImageIcon, FilmIcon, FileIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 function formatBytes(bytes: number): string {
@@ -166,16 +166,30 @@ function FileThumb({
   onRemove?: (i: number) => void;
 }) {
   const [src, setSrc] = useState<string | null>(null);
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const isVideo = ["mp4", "mov", "m4v", "avi", "mkv", "webm"].includes(ext);
+  // Browsers can't display HEIC/HEIF/AVIF natively (except Safari for HEIC)
+  const needsPlaceholder = ["heic", "heif", "tiff", "tif", "bmp"].includes(ext) || isVideo;
 
   React.useEffect(() => {
+    if (needsPlaceholder) return;
     const url = URL.createObjectURL(file);
     setSrc(url);
     return () => URL.revokeObjectURL(url);
-  }, [file]);
+  }, [file, needsPlaceholder]);
 
   return (
     <div className="group relative aspect-square overflow-hidden rounded-md border bg-muted">
-      {src ? (
+      {needsPlaceholder ? (
+        <div className="flex size-full flex-col items-center justify-center gap-1">
+          {isVideo ? (
+            <FilmIcon className="size-6 text-muted-foreground" />
+          ) : (
+            <FileIcon className="size-6 text-muted-foreground" />
+          )}
+          <span className="text-[9px] font-medium uppercase text-muted-foreground">{ext}</span>
+        </div>
+      ) : src ? (
         <img
           src={src}
           alt={file.name}
