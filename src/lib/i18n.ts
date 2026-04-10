@@ -723,6 +723,32 @@ const translations = {
   },
 
   // ---------------------------------------------------------------------------
+  // Navigation help (spoken + tooltip on info icon)
+  // ---------------------------------------------------------------------------
+  navHelp: {
+    panoramica:
+      "La panoramica mostra un riepilogo generale del sistema: statistiche sulle diapositive, lo stato della coda e le attività recenti.",
+    coda:
+      "La coda in arrivo contiene le diapositive appena caricate, in attesa di essere elaborate e archiviate nell'archivio permanente.",
+    caricamento:
+      "Da qui puoi caricare nuove immagini scansionate dal tuo Reflecta DigitDia, trascinandole o selezionandole dal computer.",
+    galleria:
+      "La galleria mostra tutte le diapositive archiviate. Puoi sfogliarle, filtrarle per collezione o caricatore, e modificare i metadati.",
+    ricerca:
+      "La ricerca ti permette di trovare diapositive per titolo, luogo, note o qualsiasi testo nei metadati, usando la ricerca full-text.",
+    utenti:
+      "Gestione utenti: qui puoi aggiungere, modificare o disattivare gli utenti che hanno accesso al sistema.",
+    backup:
+      "Da qui puoi avviare e monitorare i backup delle diapositive originali verso destinazioni esterne come S3 o NAS.",
+    impostazioni:
+      "Le impostazioni ti permettono di configurare email, WhatsApp, archiviazione, backup automatico e aspetto del sistema.",
+    registro:
+      "Il registro attività mostra la cronologia di tutte le azioni compiute dagli utenti nel sistema.",
+    aiuto:
+      "La sezione aiuto contiene la documentazione e le guide per utilizzare Dia-Storage.",
+  },
+
+  // ---------------------------------------------------------------------------
   // File sizes
   // ---------------------------------------------------------------------------
   fileSize: {

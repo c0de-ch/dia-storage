@@ -9,7 +9,7 @@ interface EmailTemplate {
 /**
  * Generate the OTP email template in Italian.
  */
-export function getOtpEmailTemplate(code: string): EmailTemplate {
+export function getOtpEmailTemplate(code: string, magicLink?: string): EmailTemplate {
   const config = getConfig();
   const appName = config.app.name;
   const expiryMinutes = config.auth.otpExpiryMinutes;
@@ -48,6 +48,13 @@ export function getOtpEmailTemplate(code: string): EmailTemplate {
                   ${code}
                 </span>
               </div>
+              ${magicLink ? `
+              <div style="text-align: center; padding: 16px 0 0;">
+                <a href="${magicLink}" style="display: inline-block; background-color: #18181b; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 8px;">
+                  Accedi direttamente
+                </a>
+              </div>
+              ` : ''}
               <p style="margin: 16px 0 0; font-size: 14px; line-height: 1.5; color: #71717a;">
                 Questo codice scade tra <strong>${expiryMinutes} minuti</strong>.
                 Non condividere questo codice con nessuno.
@@ -77,6 +84,7 @@ export function getOtpEmailTemplate(code: string): EmailTemplate {
     "",
     `Il tuo codice di accesso è: ${code}`,
     "",
+    ...(magicLink ? [`Oppure accedi direttamente: ${magicLink}`, ""] : []),
     `Questo codice scade tra ${expiryMinutes} minuti.`,
     "Non condividere questo codice con nessuno.",
     "",

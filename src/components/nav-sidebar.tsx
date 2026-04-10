@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth/context";
+import { NavHelpButton } from "@/components/nav-help-button";
 import {
   Sidebar,
   SidebarContent,
@@ -56,27 +57,32 @@ const mainNavItems = [
     label: "Panoramica",
     href: "/",
     icon: LayoutDashboardIcon,
+    helpKey: "navHelp.panoramica" as const,
   },
   {
     label: "Coda in arrivo",
     href: "/coda",
     icon: InboxIcon,
     hasBadge: true,
+    helpKey: "navHelp.coda" as const,
   },
   {
     label: t("nav.upload"),
     href: "/caricamento",
     icon: UploadIcon,
+    helpKey: "navHelp.caricamento" as const,
   },
   {
     label: t("nav.gallery"),
     href: "/galleria",
     icon: ImageIcon,
+    helpKey: "navHelp.galleria" as const,
   },
   {
     label: t("nav.search"),
     href: "/ricerca",
     icon: SearchIcon,
+    helpKey: "navHelp.ricerca" as const,
   },
 ];
 
@@ -85,21 +91,25 @@ const adminNavItems = [
     label: t("nav.users"),
     href: "/admin/utenti",
     icon: UsersIcon,
+    helpKey: "navHelp.utenti" as const,
   },
   {
     label: t("nav.backup"),
     href: "/admin/backup",
     icon: DatabaseIcon,
+    helpKey: "navHelp.backup" as const,
   },
   {
     label: t("nav.settings"),
     href: "/admin/impostazioni",
     icon: SettingsIcon,
+    helpKey: "navHelp.impostazioni" as const,
   },
   {
     label: "Registro attività",
     href: "/admin/registro",
     icon: FileTextIcon,
+    helpKey: "navHelp.registro" as const,
   },
 ];
 
@@ -155,7 +165,7 @@ export function NavSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainNavItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
+                <SidebarMenuItem key={item.href} className="group/menu-item">
                   <SidebarMenuButton
                     isActive={pathname === item.href}
                     tooltip={item.label}
@@ -167,6 +177,7 @@ export function NavSidebar() {
                   {item.hasBadge && queueCount > 0 && (
                     <SidebarMenuBadge>{queueCount}</SidebarMenuBadge>
                   )}
+                  <NavHelpButton text={t(item.helpKey)} />
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
@@ -181,7 +192,7 @@ export function NavSidebar() {
               <SidebarGroupContent>
                 <SidebarMenu>
                   {adminNavItems.map((item) => (
-                    <SidebarMenuItem key={item.href}>
+                    <SidebarMenuItem key={item.href} className="group/menu-item">
                       <SidebarMenuButton
                         isActive={pathname === item.href}
                         tooltip={item.label}
@@ -190,6 +201,7 @@ export function NavSidebar() {
                         <item.icon />
                         <span>{item.label}</span>
                       </SidebarMenuButton>
+                      <NavHelpButton text={t(item.helpKey)} />
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
@@ -201,7 +213,7 @@ export function NavSidebar() {
 
       <SidebarFooter>
         <SidebarMenu>
-          <SidebarMenuItem>
+          <SidebarMenuItem className="group/menu-item">
             <SidebarMenuButton
               tooltip="Aiuto"
               render={<Link href="/aiuto" />}
@@ -209,6 +221,7 @@ export function NavSidebar() {
               <HelpCircleIcon />
               <span>Aiuto</span>
             </SidebarMenuButton>
+            <NavHelpButton text={t("navHelp.aiuto")} />
           </SidebarMenuItem>
           <SidebarMenuItem>
             <DropdownMenu>

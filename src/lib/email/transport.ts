@@ -17,6 +17,7 @@ function getTransport(): Transporter {
     host: config.email.host,
     port: config.email.port,
     secure: config.email.secure,
+    requireTLS: true,
     ...(config.email.user && config.email.password
       ? {
           auth: {
@@ -25,6 +26,9 @@ function getTransport(): Transporter {
           },
         }
       : {}),
+    tls: {
+      rejectUnauthorized: false,
+    },
   });
 
   return transporter;
@@ -35,11 +39,14 @@ function getTransport(): Transporter {
  */
 export async function sendOtpEmail(
   email: string,
-  code: string
+  code: string,
+  origin?: string
 ): Promise<void> {
   const config = getConfig();
   const transport = getTransport();
-  const { subject, html, text } = getOtpEmailTemplate(code);
+  const baseUrl = origin ?? config.app.url;
+  const magicLink = `${baseUrl}/api/v1/auth/magic-link?email=${encodeURIComponent(email)}&code=${encodeURIComponent(code)}`;
+  const { subject, html, text } = getOtpEmailTemplate(code, magicLink);
 
   await transport.sendMail({
     from: `"${config.email.fromName}" <${config.email.from}>`,

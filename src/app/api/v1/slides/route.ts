@@ -46,9 +46,15 @@ export const GET = withAuth(async (request: NextRequest) => {
       .limit(limit)
       .offset(offset);
 
+    const slidesWithUrls = slides.map((slide) => ({
+      ...slide,
+      thumbnailUrl: slide.thumbnailPath ? `/api/v1/slides/${slide.id}/thumbnail` : null,
+      mediumUrl: slide.mediumPath ? `/api/v1/slides/${slide.id}/medium` : null,
+    }));
+
     return NextResponse.json({
       success: true,
-      slides,
+      slides: slidesWithUrls,
       pagination: {
         page,
         limit,

@@ -127,7 +127,7 @@ function BatchCard({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CardTitle className="text-base">
-              Lotto {batch.id.slice(0, 8)}
+              Lotto {(batch.id ?? "").slice(0, 8)}
             </CardTitle>
             <SourceIcon source={batch.source} />
             <span className="text-xs text-muted-foreground">
@@ -283,7 +283,24 @@ export default function CodaPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setBatches(data.batches ?? data.items ?? []);
+        const raw = data.batches ?? data.items ?? [];
+        // Map API response to Batch interface
+        const mapped: Batch[] = raw.map((b: Record<string, unknown>) => ({
+          id: (b.batchId ?? b.id ?? String(Math.random())) as string,
+          slides: Array.isArray(b.slides)
+            ? b.slides.map((s: Record<string, unknown>) => ({
+                id: String(s.id ?? ""),
+                thumbnailUrl: s.thumbnailPath
+                  ? `/api/v1/slides/${s.id}/thumbnail`
+                  : undefined,
+                originalFilename: s.originalFilename as string | undefined,
+              }))
+            : [],
+          count: (b.count ?? 0) as number,
+          source: (b.source ?? "web") as Batch["source"],
+          uploadedAt: (b.createdAt ?? b.uploadedAt ?? new Date().toISOString()) as string,
+        }));
+        setBatches(mapped);
       }
     } catch {
       toast.error(t("errors.generic"));
@@ -299,10 +316,10 @@ export default function CodaPage() {
   const handleArchive = useCallback(
     async (batchId: string, meta: BatchMeta) => {
       try {
-        const res = await fetch(`/api/v1/batches/${batchId}/archive`, {
+        const res = await fetch("/api/v1/slides/batch/archive", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(meta),
+          body: JSON.stringify({ batchId, metadata: meta }),
           credentials: "include",
         });
         if (!res.ok) throw new Error();
@@ -317,8 +334,10 @@ export default function CodaPage() {
 
   const handleDelete = useCallback(async (batchId: string) => {
     try {
-      const res = await fetch(`/api/v1/batches/${batchId}`, {
-        method: "DELETE",
+      const res = await fetch("/api/v1/slides/batch/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId }),
         credentials: "include",
       });
       if (!res.ok) throw new Error();

@@ -33,7 +33,7 @@ export default function AccessoPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/v1/auth/otp/send", {
+      const res = await fetch("/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -42,7 +42,7 @@ export default function AccessoPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? t("errors.generic"));
+        throw new Error(data.message ?? data.error ?? t("errors.generic"));
       }
 
       setStep("otp");
@@ -63,7 +63,7 @@ export default function AccessoPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/v1/auth/otp/verify", {
+      const res = await fetch("/api/v1/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code: otp }),
@@ -72,10 +72,10 @@ export default function AccessoPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? t("errors.invalidOtp"));
+        throw new Error(data.message ?? data.error ?? t("errors.invalidOtp"));
       }
 
-      router.push("/");
+      window.location.href = "/";
     } catch (err) {
       setError(
         err instanceof Error ? err.message : t("errors.generic")

@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth/context";
 import { NavSidebar } from "@/components/nav-sidebar";
+import { HelpBot } from "@/components/help-bot";
 import {
   SidebarProvider,
   SidebarInset,
@@ -90,6 +91,7 @@ export default function DashboardLayout({
         </header>
         <div className="flex-1 overflow-auto p-4 md:p-6">{children}</div>
       </SidebarInset>
+      <HelpBot />
     </SidebarProvider>
   );
 }

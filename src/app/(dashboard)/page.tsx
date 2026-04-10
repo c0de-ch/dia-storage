@@ -43,7 +43,7 @@ export default function DashboardPage() {
       try {
         const [statsRes, slidesRes] = await Promise.all([
           fetch("/api/v1/dashboard/stats", { credentials: "include" }),
-          fetch("/api/v1/slides?limit=10&sort=createdAt:desc", {
+          fetch("/api/v1/slides?limit=10&sortBy=createdAt&sortOrder=desc", {
             credentials: "include",
           }),
         ]);
@@ -119,11 +119,11 @@ export default function DashboardPage() {
 
       {/* Quick actions */}
       <div className="flex flex-wrap gap-3">
-        <Button render={<Link href="/caricamento" />}>
+        <Button nativeButton={false} render={<Link href="/caricamento" />}>
           <UploadIcon />
           Carica diapositive
         </Button>
-        <Button variant="outline" render={<Link href="/galleria" />}>
+        <Button variant="outline" nativeButton={false} render={<Link href="/galleria" />}>
           <ImageIcon />
           Sfoglia galleria
         </Button>

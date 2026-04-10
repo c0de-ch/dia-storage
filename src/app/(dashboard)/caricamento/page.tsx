@@ -24,8 +24,10 @@ import {
 } from "@/components/upload-progress";
 import {
   CheckCircle2Icon,
+  DownloadIcon,
   InboxIcon,
   Loader2Icon,
+  MonitorSmartphoneIcon,
   UploadIcon,
 } from "lucide-react";
 
@@ -108,7 +110,20 @@ export default function CaricamentoPage() {
           );
         }
 
-        statuses[i] = { ...statuses[i], status: "done", progress: 100 };
+        const data = await res.json();
+        // Check for duplicate warning in response
+        const fileResult = data.results?.[0];
+        if (fileResult && fileResult.duplicate) {
+          statuses[i] = {
+            ...statuses[i],
+            status: "error",
+            progress: 100,
+            error: fileResult.message,
+          };
+          toast.warning(`${files[i].name}: ${fileResult.message}`);
+        } else {
+          statuses[i] = { ...statuses[i], status: "done", progress: 100 };
+        }
       } catch (err) {
         statuses[i] = {
           ...statuses[i],
@@ -171,7 +186,7 @@ export default function CaricamentoPage() {
               </p>
             </div>
             <div className="flex gap-3">
-              <Button render={<Link href="/coda" />}>
+              <Button nativeButton={false} render={<Link href="/coda" />}>
                 <InboxIcon />
                 Vai alla coda
               </Button>
@@ -262,6 +277,40 @@ export default function CaricamentoPage() {
               overallProgress={overallProgress}
               onCancel={handleCancel}
             />
+          )}
+
+          {/* SD card companion app */}
+          {uploadState !== "uploading" && (
+            <Card>
+              <CardContent className="flex items-center gap-4 py-4">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <MonitorSmartphoneIcon className="size-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">
+                    Importa automaticamente dalla scheda SD
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Usa l&apos;app Dia-Uploader per macOS per importare le diapositive direttamente dallo scanner
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  nativeButton={false}
+                  render={
+                    <a
+                      href="https://github.com/c0de-ch/dia-storage/releases/latest"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    />
+                  }
+                >
+                  <DownloadIcon />
+                  Scarica Dia-Uploader
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
           {/* Upload button */}

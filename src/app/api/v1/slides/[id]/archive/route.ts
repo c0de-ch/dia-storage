@@ -34,7 +34,7 @@ export const POST = withAuth(async (request: NextRequest, context) => {
     const { title, dateTaken, location, magazineId, slotNumber, notes } = body;
 
     const updateData: Record<string, unknown> = {
-      status: 'archived',
+      status: 'active',
       updatedAt: new Date(),
     };
 

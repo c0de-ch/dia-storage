@@ -8,8 +8,11 @@ import { eq } from 'drizzle-orm';
 const SENSITIVE_FIELDS = [
   'smtpPassword',
   'whatsappApiKey',
+  'whatsappAccessToken',
   's3SecretKey',
   'nasPassword',
+  'anthropicApiKey',
+  'ollamaApiKey',
 ];
 
 function maskSensitiveFields(config: Record<string, unknown>): Record<string, unknown> {

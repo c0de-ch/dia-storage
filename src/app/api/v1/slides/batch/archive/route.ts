@@ -35,7 +35,7 @@ export const POST = withAuth(async (request: NextRequest) => {
     }
 
     const updateData: Record<string, unknown> = {
-      status: 'archived',
+      status: 'active',
       updatedAt: new Date(),
     };
 

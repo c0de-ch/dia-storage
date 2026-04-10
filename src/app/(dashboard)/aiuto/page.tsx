@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
+  BookOpenIcon,
   CircleHelp,
   Headset,
   Mail,
@@ -358,6 +359,151 @@ export default function AiutoPage() {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+        </CardContent>
+      </Card>
+
+      {/* Scanner Manual Reference */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BookOpenIcon className="size-5" />
+            Manuale Scanner Reflecta DigitDia Evolution
+          </CardTitle>
+          <CardDescription>
+            Immagini di riferimento dal manuale originale dello scanner.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          {/* Scanner overview */}
+          <div>
+            <h3 className="mb-3 text-lg font-semibold">
+              Panoramica dello scanner
+            </h3>
+            <div className="overflow-hidden rounded-lg border">
+              <img
+                src="/images/manual/scanner-overview.jpg"
+                alt="Reflecta DigitDia Evolution - panoramica"
+                className="w-full max-w-lg"
+              />
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Lo scanner Reflecta DigitDia Evolution con display LCD da 7 pollici,
+              caricatore inserito e scheda SD per il salvataggio delle scansioni.
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* Product parts */}
+          <div>
+            <h3 className="mb-3 text-lg font-semibold">
+              Componenti del dispositivo
+            </h3>
+            <div className="overflow-hidden rounded-lg border">
+              <img
+                src="/images/manual/product-parts.jpg"
+                alt="Reflecta DigitDia Evolution - componenti numerati"
+                className="w-full max-w-2xl"
+              />
+            </div>
+            <div className="mt-3 grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
+              <div><strong>1.</strong> Display LCD</div>
+              <div><strong>2.</strong> LED di controllo</div>
+              <div><strong>3.</strong> Interruttore accensione (tenere 3s per spegnere)</div>
+              <div><strong>4.</strong> Tasto HOME (menu principale)</div>
+              <div><strong>5.</strong> Freccia sinistra</div>
+              <div><strong>6.</strong> Freccia destra / Trasporto</div>
+              <div><strong>7.</strong> Tasto OK / Enter</div>
+              <div><strong>8.</strong> Tasto Scansione (avvio/stop)</div>
+              <div><strong>9.</strong> Presa alimentazione 12V</div>
+              <div><strong>10.</strong> Slot scheda SD</div>
+              <div><strong>11.</strong> Uscita HDMI</div>
+              <div><strong>12.</strong> Dia-Lift con apertura pulizia</div>
+              <div><strong>13.</strong> Spingitore diapositive (Diaschieber)</div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Magazine usage */}
+          <div>
+            <h3 className="mb-3 text-lg font-semibold">
+              Utilizzo dei caricatori (magazine)
+            </h3>
+            <div className="overflow-hidden rounded-lg border">
+              <img
+                src="/images/manual/magazine-usage.jpg"
+                alt="Reflecta DigitDia Evolution - utilizzo caricatori"
+                className="w-full max-w-2xl"
+              />
+            </div>
+            <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+              <p>
+                <strong>Tipi di caricatori compatibili:</strong> Universal (DIN 108),
+                CS e LKM (Leica-Kindermann).
+              </p>
+              <p>
+                <strong>Universal (DIN 108):</strong> posizionare la leva dello
+                spingitore verso il basso.
+              </p>
+              <p>
+                <strong>CS e LKM:</strong> posizionare la leva dello spingitore
+                verso l&apos;alto.
+              </p>
+              <p>
+                <strong>Inserimento:</strong> inserire il caricatore da sinistra nella
+                fessura fino a quando non tocca lo spingitore.
+              </p>
+              <p>
+                Le diapositive devono essere inserite nel formato orizzontale,
+                con la superficie dell&apos;emulsione rivolta a destra, a partire dalla
+                posizione 1.
+              </p>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Specs summary */}
+          <div>
+            <h3 className="mb-3 text-lg font-semibold">
+              Specifiche tecniche
+            </h3>
+            <div className="grid gap-2 text-sm sm:grid-cols-2">
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="font-medium">Sensore</p>
+                <p className="text-muted-foreground">CMOS 1/2,33&quot; - 15,3 MP</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="font-medium">Risoluzione</p>
+                <p className="text-muted-foreground">4608 x 3072 px (14MP) o 5760 x 3840 px (22MP interp.)</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="font-medium">Velocita scansione</p>
+                <p className="text-muted-foreground">&lt; 5 sec per diapositiva (automatico)</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="font-medium">Formato output</p>
+                <p className="text-muted-foreground">JPEG (compressione bassa)</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="font-medium">Caricatori</p>
+                <p className="text-muted-foreground">Universal (DIN 108), CS, LKM</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="font-medium">Memoria</p>
+                <p className="text-muted-foreground">Scheda SD/SDHC fino a 128 GB</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="font-medium">Display</p>
+                <p className="text-muted-foreground">LCD IPS 7 pollici (17,8 cm)</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="font-medium">Dimensioni</p>
+                <p className="text-muted-foreground">245 x 243 x 141 mm, 1650 g</p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

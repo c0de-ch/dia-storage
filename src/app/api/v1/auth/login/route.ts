@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
+import { sendOtpEmail } from '@/lib/email/transport';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = process.env.NODE_ENV === 'development' ? '000000' : Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     await db.insert(schema.otpCodes).values({
@@ -46,7 +47,19 @@ export async function POST(request: NextRequest) {
       expiresAt,
     });
 
-    // TODO: send OTP via configured channel (email/whatsapp)
+    const host = request.headers.get('host') ?? new URL(request.url).host;
+    const proto = request.headers.get('x-forwarded-proto') ?? 'http';
+    const origin = `${proto}://${host}`;
+
+    try {
+      await sendOtpEmail(user.email, code, origin);
+    } catch (emailErr) {
+      console.error('Errore invio OTP email:', emailErr);
+      return NextResponse.json(
+        { success: false, message: 'Errore nell\'invio dell\'email. Verificare la configurazione SMTP.' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

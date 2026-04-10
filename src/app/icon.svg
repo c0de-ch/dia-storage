@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Kodak-style slide mount (outer cardboard frame) -->
+  <rect x="16" y="16" width="480" height="480" rx="24" ry="24" fill="#F5D547"/>
+  <rect x="24" y="24" width="464" height="464" rx="18" ry="18" fill="#E8C83A" stroke="#C4A52E" stroke-width="4"/>
+
+  <!-- Film window (dark opening) -->
+  <rect x="96" y="112" width="320" height="288" rx="8" ry="8" fill="#1A1A2E"/>
+
+  <!-- Film image area - sunset/landscape feel -->
+  <rect x="104" y="120" width="304" height="272" rx="4" ry="4" fill="#2D3561"/>
+  <!-- Sky gradient -->
+  <rect x="104" y="120" width="304" height="160" rx="4" ry="0" fill="#E8573A" opacity="0.7"/>
+  <rect x="104" y="120" width="304" height="100" rx="4" ry="0" fill="#F5A623" opacity="0.5"/>
+  <!-- Sun -->
+  <circle cx="256" cy="220" r="40" fill="#FFD93D" opacity="0.9"/>
+  <!-- Mountains -->
+  <polygon points="104,340 180,240 256,320 104,340" fill="#1A1A2E" opacity="0.8"/>
+  <polygon points="180,340 280,220 380,340" fill="#16213E" opacity="0.9"/>
+  <polygon points="300,340 380,260 408,340" fill="#1A1A2E" opacity="0.7"/>
+  <!-- Ground -->
+  <rect x="104" y="340" width="304" height="52" rx="0" ry="4" fill="#0F3460"/>
+
+  <!-- Slide mount notch marks -->
+  <circle cx="60" cy="60" r="12" fill="#C4A52E"/>
+  <circle cx="452" cy="60" r="12" fill="#C4A52E"/>
+  <circle cx="60" cy="452" r="12" fill="#C4A52E"/>
+  <circle cx="452" cy="452" r="12" fill="#C4A52E"/>
+
+  <!-- Kodak-style text -->
+  <text x="256" y="88" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="42" fill="#8B6914" letter-spacing="6">DIA</text>
+  <text x="256" y="448" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="28" fill="#8B6914" letter-spacing="3">STORAGE</text>
+</svg>

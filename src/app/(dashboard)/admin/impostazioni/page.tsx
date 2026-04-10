@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
+  BotIcon,
   Eye,
   EyeOff,
   Globe,
@@ -17,6 +18,8 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -125,6 +128,8 @@ export default function ImpostazioniPage() {
   const [config, setConfig] = useState<ConfigMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
+  const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -140,9 +145,36 @@ export default function ImpostazioniPage() {
     }
   }, []);
 
+  const fetchOllamaModels = useCallback(async (url?: string) => {
+    const ollamaUrl = url ?? getStr("ollamaUrl", "http://localhost:11434");
+    setOllamaModelsLoading(true);
+    try {
+      const res = await fetch("/api/v1/config/ollama-models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ollamaUrl }),
+      });
+      const data = await res.json();
+      setOllamaModels(data.models ?? []);
+    } catch {
+      setOllamaModels([]);
+    } finally {
+      setOllamaModelsLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config]);
+
   useEffect(() => {
     fetchConfig();
   }, [fetchConfig]);
+
+  // Fetch Ollama models when provider is ollama and config loads
+  useEffect(() => {
+    if (!loading && getStr("aiProvider", "anthropic") === "ollama") {
+      fetchOllamaModels();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, config["aiProvider"]]);
 
   function updateField(key: string, value: string | number | boolean) {
     setConfig((prev) => ({ ...prev, [key]: value }));
@@ -257,6 +289,10 @@ export default function ImpostazioniPage() {
           <TabsTrigger value="pianificazione">
             <Clock className="size-3.5 mr-1" />
             Pianificazione
+          </TabsTrigger>
+          <TabsTrigger value="assistente-ia">
+            <BotIcon className="size-3.5 mr-1" />
+            Assistente IA
           </TabsTrigger>
         </TabsList>
 
@@ -997,6 +1033,221 @@ export default function ImpostazioniPage() {
                     saveConfig({
                       scheduleEnabled: getBool("scheduleEnabled"),
                       cronExpression: getStr("cronExpression", "0 2 * * *"),
+                    })
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        {/* ---- Assistente IA ---- */}
+        <TabsContent value="assistente-ia">
+          <Card>
+            <CardHeader>
+              <CardTitle>Assistente IA (Claude)</CardTitle>
+              <CardDescription>
+                Configura l&apos;integrazione con Claude di Anthropic per
+                l&apos;assistente vocale. L&apos;assistente risponde alle domande
+                degli utenti sull&apos;applicazione.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 max-w-lg">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="ai-enabled">Abilita assistente IA</Label>
+                  <Switch
+                    id="ai-enabled"
+                    checked={getBool("aiEnabled")}
+                    onCheckedChange={(v) => updateField("aiEnabled", v)}
+                  />
+                </div>
+
+                {/* Provider selection */}
+                <div className="grid gap-1.5">
+                  <Label>Provider</Label>
+                  <Select
+                    value={getStr("aiProvider", "anthropic")}
+                    onValueChange={(v) => { if (v) updateField("aiProvider", v); }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="anthropic">Claude (Anthropic)</SelectItem>
+                      <SelectItem value="ollama">Modello locale (Ollama)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Anthropic settings */}
+                {getStr("aiProvider", "anthropic") === "anthropic" && (
+                  <>
+                    <MaskedField
+                      id="anthropic-api-key"
+                      label="Chiave API Anthropic"
+                      value={getStr("anthropicApiKey")}
+                      onChange={(v) => updateField("anthropicApiKey", v)}
+                      placeholder="sk-ant-..."
+                    />
+
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="ai-model">Modello</Label>
+                      <Select
+                        value={getStr("aiModel", "claude-haiku-4-5-20251001")}
+                        onValueChange={(v) => { if (v) updateField("aiModel", v); }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="claude-haiku-4-5-20251001">
+                            Claude Haiku 4.5 (veloce, economico)
+                          </SelectItem>
+                          <SelectItem value="claude-sonnet-4-6">
+                            Claude Sonnet 4.6 (bilanciato)
+                          </SelectItem>
+                          <SelectItem value="claude-opus-4-6">
+                            Claude Opus 4.6 (avanzato)
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="ai-max-monthly-usd">
+                        Limite spesa mensile (USD): ${getNum("aiMaxMonthlyUsd", 5).toFixed(2)}
+                      </Label>
+                      <input
+                        id="ai-max-monthly-usd"
+                        type="range"
+                        min={1}
+                        max={100}
+                        step={1}
+                        value={getNum("aiMaxMonthlyUsd", 5)}
+                        onChange={(e) =>
+                          updateField("aiMaxMonthlyUsd", Number(e.target.value))
+                        }
+                        className="w-full accent-primary"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Quando il limite viene raggiunto, l&apos;assistente smette di
+                        rispondere fino al mese successivo.
+                      </p>
+                    </div>
+
+                    {/* Usage display */}
+                    <div className="rounded-lg bg-muted/50 p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                          Utilizzo mese corrente
+                        </p>
+                        <p className="text-sm font-medium">
+                          ${getNum("aiCurrentMonthUsageUsd", 0).toFixed(4)} / ${getNum("aiMaxMonthlyUsd", 5).toFixed(2)}
+                        </p>
+                      </div>
+                      <Progress
+                        value={
+                          getNum("aiMaxMonthlyUsd", 5) > 0
+                            ? Math.min(
+                                100,
+                                (getNum("aiCurrentMonthUsageUsd", 0) /
+                                  getNum("aiMaxMonthlyUsd", 5)) *
+                                  100
+                              )
+                            : 0
+                        }
+                        className="mt-2"
+                      >
+                        <ProgressValue />
+                      </Progress>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Richieste questo mese: {getNum("aiCurrentMonthRequests", 0)}
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {/* Ollama settings */}
+                {getStr("aiProvider", "anthropic") === "ollama" && (
+                  <>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="ollama-url">URL Ollama</Label>
+                      <Input
+                        id="ollama-url"
+                        value={getStr("ollamaUrl", "http://localhost:11434")}
+                        onChange={(e) => updateField("ollamaUrl", e.target.value)}
+                        placeholder="http://localhost:11434"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Indirizzo del server Ollama in rete locale.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="ollama-model">Modello Ollama</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => fetchOllamaModels()}
+                          disabled={ollamaModelsLoading}
+                        >
+                          {ollamaModelsLoading ? (
+                            <Loader2 className="size-3 animate-spin mr-1" />
+                          ) : (
+                            <RefreshCw className="size-3 mr-1" />
+                          )}
+                          Aggiorna
+                        </Button>
+                      </div>
+                      {ollamaModels.length > 0 ? (
+                        <Select
+                          value={getStr("ollamaModel", "llama3.2")}
+                          onValueChange={(v) => { if (v) updateField("ollamaModel", v); }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Seleziona modello..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ollamaModels.map((model) => (
+                              <SelectItem key={model} value={model}>
+                                {model}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          id="ollama-model"
+                          value={getStr("ollamaModel", "llama3.2")}
+                          onChange={(e) => updateField("ollamaModel", e.target.value)}
+                          placeholder="llama3.2"
+                        />
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {ollamaModelsLoading
+                          ? "Recupero modelli dal server..."
+                          : ollamaModels.length > 0
+                            ? `${ollamaModels.length} modelli disponibili sul server.`
+                            : "Impossibile contattare il server. Inserisci il nome manualmente oppure premi Aggiorna."}
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                <SaveButton
+                  saving={saving}
+                  onClick={() =>
+                    saveConfig({
+                      aiEnabled: getBool("aiEnabled"),
+                      aiProvider: getStr("aiProvider", "anthropic"),
+                      anthropicApiKey: getStr("anthropicApiKey"),
+                      aiModel: getStr("aiModel", "claude-haiku-4-5-20251001"),
+                      aiMaxMonthlyUsd: getNum("aiMaxMonthlyUsd", 5),
+                      ollamaUrl: getStr("ollamaUrl", "http://localhost:11434"),
+                      ollamaModel: getStr("ollamaModel", "llama3.2"),
                     })
                   }
                 />
