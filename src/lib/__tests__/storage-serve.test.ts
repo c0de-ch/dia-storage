@@ -151,4 +151,85 @@ describe("serveFile", () => {
     const cacheControl = response.headers.get("Cache-Control")!;
     expect(cacheControl).toContain("max-age=31536000");
   });
+
+  it("handles string chunks from the node stream", async () => {
+    mockExistsSync.mockReturnValue(true);
+    vi.mocked(stat).mockResolvedValue({ size: 100, mtime: new Date() } as never);
+
+    const listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
+    const mockStream = {
+      on(event: string, cb: (...args: unknown[]) => void) {
+        if (!listeners[event]) listeners[event] = [];
+        listeners[event].push(cb);
+        if (event === "end") {
+          queueMicrotask(() => {
+            // Emit a string chunk instead of a Buffer
+            listeners["data"]?.forEach((fn) => fn("string-data"));
+            listeners["end"]?.forEach((fn) => fn());
+          });
+        }
+        return this;
+      },
+      destroy: vi.fn(),
+    };
+    mockCreateReadStream.mockReturnValue(mockStream);
+
+    const response = await serveFile("/data/image.jpg");
+    const body = await response.arrayBuffer();
+    const decoded = new TextDecoder().decode(body);
+    expect(decoded).toBe("string-data");
+  });
+
+  it("propagates stream errors to the response body", async () => {
+    mockExistsSync.mockReturnValue(true);
+    vi.mocked(stat).mockResolvedValue({ size: 100, mtime: new Date() } as never);
+
+    const streamError = new Error("read failure");
+    const listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
+    const mockStream = {
+      on(event: string, cb: (...args: unknown[]) => void) {
+        if (!listeners[event]) listeners[event] = [];
+        listeners[event].push(cb);
+        // Emit error after a tick
+        if (event === "error") {
+          queueMicrotask(() => {
+            listeners["error"]?.forEach((fn) => fn(streamError));
+          });
+        }
+        return this;
+      },
+      destroy: vi.fn(),
+    };
+    mockCreateReadStream.mockReturnValue(mockStream);
+
+    const response = await serveFile("/data/image.jpg");
+    expect(response.status).toBe(200);
+
+    const reader = response.body!.getReader();
+    await expect(reader.read()).rejects.toThrow("read failure");
+  });
+
+  it("destroys the node stream when the web stream is cancelled", async () => {
+    mockExistsSync.mockReturnValue(true);
+    vi.mocked(stat).mockResolvedValue({ size: 100, mtime: new Date() } as never);
+
+    const listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
+    const destroyFn = vi.fn();
+    const mockStream = {
+      on(event: string, cb: (...args: unknown[]) => void) {
+        if (!listeners[event]) listeners[event] = [];
+        listeners[event].push(cb);
+        return this;
+      },
+      destroy: destroyFn,
+    };
+    mockCreateReadStream.mockReturnValue(mockStream);
+
+    const response = await serveFile("/data/image.jpg");
+    expect(response.status).toBe(200);
+
+    // Cancel the web stream, which should trigger the cancel() callback
+    await response.body!.cancel();
+    expect(destroyFn).toHaveBeenCalled();
+  });
 });
