@@ -12,6 +12,8 @@ permissions:
 jobs:
   build:
     runs-on: macos-latest
+    env:
+      VERSION: ${{ github.ref_name || 'dev' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,6 +31,8 @@ jobs:
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             ONLY_ACTIVE_ARCH=NO \
+            MARKETING_VERSION="${VERSION#v}" \
+            CURRENT_PROJECT_VERSION="${VERSION#v}" \
             build
 
       - name: Package app
@@ -36,27 +40,27 @@ jobs:
           APP_PATH=$(find macos/build -name "DiaUploader.app" -type d | head -1)
           echo "Found app at: $APP_PATH"
           cd $(dirname "$APP_PATH")
-          zip -r "$GITHUB_WORKSPACE/DiaUploader-macOS.zip" DiaUploader.app
-          ls -la "$GITHUB_WORKSPACE/DiaUploader-macOS.zip"
+          zip -r "$GITHUB_WORKSPACE/DiaUploader-macOS-${VERSION}.zip" DiaUploader.app
+          ls -la "$GITHUB_WORKSPACE/DiaUploader-macOS-${VERSION}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DiaUploader-macOS
-          path: DiaUploader-macOS.zip
+          name: DiaUploader-macOS-${{ env.VERSION }}
+          path: DiaUploader-macOS-${{ env.VERSION }}.zip
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: DiaUploader-macOS.zip
+          files: DiaUploader-macOS-${{ env.VERSION }}.zip
           body: |
-            ## Dia-Uploader per macOS
+            ## Dia-Uploader ${{ env.VERSION }} per macOS
 
             App companion per caricare automaticamente le diapositive dallo scanner Reflecta DigitDia Evolution.
 
             ### Installazione
-            1. Scarica `DiaUploader-macOS.zip`
+            1. Scarica `DiaUploader-macOS-${{ env.VERSION }}.zip`
             2. Decomprimi e sposta `DiaUploader.app` nella cartella Applicazioni
             3. Apri l'app (potrebbe essere necessario andare in Impostazioni > Privacy e Sicurezza > "Apri comunque")
             4. Configura: URL del server + chiave API
