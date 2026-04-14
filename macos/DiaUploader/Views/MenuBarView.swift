@@ -9,6 +9,7 @@ struct MenuBarView: View {
     @State private var selectedFiles: Set<URL> = []
     @State private var showCompletion = false
     @State private var lastUploadCount = 0
+    @State private var wasUploading = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -50,17 +51,18 @@ struct MenuBarView: View {
                 }
             }
         }
-        .onChange(of: appState.detectedFiles) { _, newFiles in
+        .onChange(of: appState.detectedFiles) { newFiles in
             selectedFiles = Set(newFiles)
         }
-        .onChange(of: appState.isUploading) { oldValue, newValue in
-            if oldValue && !newValue {
+        .onChange(of: appState.isUploading) { isUploading in
+            if wasUploading && !isUploading {
                 // Upload just finished
                 if let lastUpload = appState.recentUploads.first, lastUpload.success {
                     lastUploadCount = lastUpload.count
                     showCompletion = true
                 }
             }
+            wasUploading = isUploading
         }
     }
 
