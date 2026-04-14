@@ -6,9 +6,13 @@ import Link from "next/link";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  EyeIcon,
   ImageIcon,
   Loader2Icon,
   Trash2Icon,
+  Volume2Icon,
+  VolumeOffIcon,
+  XIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +50,9 @@ export default function SlideDetailPage() {
   const [siblings, setSiblings] = useState<Slide[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [describing, setDescribing] = useState(false);
+  const [description, setDescription] = useState<string | null>(null);
+  const [speaking, setSpeaking] = useState(false);
 
   // Fetch slide
   const fetchSlide = useCallback(async () => {
@@ -72,6 +79,9 @@ export default function SlideDetailPage() {
 
   useEffect(() => {
     setLoading(true);
+    setDescription(null);
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    setSpeaking(false);
     fetchSlide();
   }, [fetchSlide]);
 
@@ -130,6 +140,48 @@ export default function SlideDetailPage() {
     } catch (error) {
       console.error("Errore nella scrittura EXIF:", error);
     }
+  }
+
+  // AI describe image
+  async function handleDescribe() {
+    setDescribing(true);
+    setDescription(null);
+    try {
+      const res = await fetch(`/api/v1/slides/${slideId}/describe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lang: navigator.language || "it-IT" }),
+      });
+      const data = await res.json();
+      if (data.success && data.description) {
+        setDescription(data.description);
+        speakText(data.description);
+      } else {
+        setDescription(data.message || "Errore nella descrizione.");
+      }
+    } catch (error) {
+      console.error("Errore nella descrizione:", error);
+      setDescription("Errore nella connessione al servizio IA.");
+    } finally {
+      setDescribing(false);
+    }
+  }
+
+  function speakText(text: string) {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = navigator.language || "it-IT";
+    utterance.rate = 0.95;
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function stopSpeaking() {
+    window.speechSynthesis.cancel();
+    setSpeaking(false);
   }
 
   if (loading) {
@@ -213,13 +265,53 @@ export default function SlideDetailPage() {
 
       {/* Main content: two columns */}
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        {/* Left: Image viewer */}
-        <ImageViewer
-          src={`/api/v1/slides/${slide.id}/medium`}
-          alt={displayTitle}
-          downloadUrl={`/api/v1/slides/${slide.id}/original`}
-          className="aspect-[4/3] w-full"
-        />
+        {/* Left: Image viewer + describe */}
+        <div className="flex flex-col gap-3">
+          <ImageViewer
+            src={`/api/v1/slides/${slide.id}/medium`}
+            alt={displayTitle}
+            downloadUrl={`/api/v1/slides/${slide.id}/original`}
+            className="aspect-[4/3] w-full"
+          />
+
+          {/* AI Description */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDescribe}
+              disabled={describing}
+            >
+              {describing ? (
+                <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
+              ) : (
+                <EyeIcon className="mr-1.5 size-3.5" />
+              )}
+              {describing ? "Analisi in corso..." : "Descrivi immagine"}
+            </Button>
+            {description && (
+              <>
+                {speaking ? (
+                  <Button variant="ghost" size="icon-sm" onClick={stopSpeaking} title="Ferma lettura">
+                    <VolumeOffIcon className="size-3.5" />
+                  </Button>
+                ) : (
+                  <Button variant="ghost" size="icon-sm" onClick={() => speakText(description)} title="Riascolta">
+                    <Volume2Icon className="size-3.5" />
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon-sm" onClick={() => { stopSpeaking(); setDescription(null); }} title="Chiudi">
+                  <XIcon className="size-3.5" />
+                </Button>
+              </>
+            )}
+          </div>
+          {description && (
+            <div className="rounded-lg border bg-muted/50 p-3 text-sm leading-relaxed">
+              {description}
+            </div>
+          )}
+        </div>
 
         {/* Right: Metadata form + actions */}
         <div className="flex flex-col gap-4">

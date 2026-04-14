@@ -3,15 +3,27 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth } from '@/lib/auth/middleware';
 import { t } from '@/lib/i18n';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, count } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {
   try {
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'));
+    const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '100')));
+    const offset = (page - 1) * limit;
+
+    const [totalResult] = await db
+      .select({ total: count() })
+      .from(schema.slides)
+      .where(eq(schema.slides.status, 'incoming'));
+
     const slides = await db
       .select()
       .from(schema.slides)
       .where(eq(schema.slides.status, 'incoming'))
-      .orderBy(desc(schema.slides.createdAt));
+      .orderBy(desc(schema.slides.createdAt))
+      .limit(limit)
+      .offset(offset);
 
     const batches: Record<string, typeof slides> = {};
     for (const slide of slides) {
@@ -32,7 +44,13 @@ export const GET = withAuth(async (request: NextRequest) => {
     return NextResponse.json({
       success: true,
       batches: groupedBatches,
-      total: slides.length,
+      total: totalResult.total,
+      pagination: {
+        page,
+        limit,
+        total: totalResult.total,
+        totalPages: Math.ceil(totalResult.total / limit),
+      },
     });
   } catch (error) {
     console.error('Errore nel recupero delle diapositive in arrivo:', error);

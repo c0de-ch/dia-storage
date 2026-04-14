@@ -1,6 +1,6 @@
 import { access, copyFile, stat, constants } from 'node:fs/promises';
 import { join, dirname, relative } from 'node:path';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
@@ -137,12 +137,12 @@ export async function runNasBackup(): Promise<{
     .returning();
 
   let totalBytes = 0;
+  const backedUpIds: number[] = [];
 
   for (const slide of pending) {
     if (!slide.storagePath) continue;
 
     try {
-      // Compute relative path from storage base
       const relPath = relative(basePath, slide.storagePath);
       const nasDest = join(nasConfig.mountPath, nasConfig.subdir, relPath);
 
@@ -151,16 +151,7 @@ export async function runNasBackup(): Promise<{
       const fileStat = await stat(slide.storagePath);
       totalBytes += fileStat.size;
 
-      // Mark as backed up
-      await db
-        .update(schema.slides)
-        .set({
-          backedUp: true,
-          backedUpAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.slides.id, slide.id));
-
+      backedUpIds.push(slide.id);
       copied++;
     } catch (err) {
       errors.push({
@@ -168,6 +159,18 @@ export async function runNasBackup(): Promise<{
         error: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+
+  // Batch-update all successfully backed up slides
+  if (backedUpIds.length > 0) {
+    await db
+      .update(schema.slides)
+      .set({
+        backedUp: true,
+        backedUpAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(inArray(schema.slides.id, backedUpIds));
   }
 
   // Update history

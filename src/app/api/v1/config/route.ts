@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAdmin } from '@/lib/auth/middleware';
 import { t } from '@/lib/i18n';
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 
 const SENSITIVE_FIELDS = [
   'smtpPassword',
@@ -61,25 +61,22 @@ export const PUT = withAdmin(async (request: NextRequest) => {
       );
     }
 
-    for (const [key, value] of Object.entries(body)) {
-      const [existing] = await db
-        .select()
-        .from(schema.settings)
-        .where(eq(schema.settings.key, key))
-        .limit(1);
+    const entries = Object.entries(body).map(([key, value]) => ({
+      key,
+      value: String(value),
+      updatedAt: new Date(),
+    }));
 
-      if (existing) {
-        await db
-          .update(schema.settings)
-          .set({ value: String(value), updatedAt: new Date() })
-          .where(eq(schema.settings.key, key));
-      } else {
-        await db.insert(schema.settings).values({
-          key,
-          value: String(value),
-        });
-      }
-    }
+    await db
+      .insert(schema.settings)
+      .values(entries)
+      .onConflictDoUpdate({
+        target: schema.settings.key,
+        set: {
+          value: sql`excluded.value`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+      });
 
     return NextResponse.json({
       success: true,

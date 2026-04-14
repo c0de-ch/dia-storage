@@ -3,15 +3,33 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth } from '@/lib/auth/middleware';
 import { t } from '@/lib/i18n';
-import { eq } from 'drizzle-orm';
+import { count, desc } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {
   try {
-    const magazines = await db.select().from(schema.magazines);
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '50')));
+    const offset = (page - 1) * limit;
+
+    const [totalResult] = await db.select({ total: count() }).from(schema.magazines);
+
+    const magazines = await db
+      .select()
+      .from(schema.magazines)
+      .orderBy(desc(schema.magazines.createdAt))
+      .limit(limit)
+      .offset(offset);
 
     return NextResponse.json({
       success: true,
       magazines,
+      pagination: {
+        page,
+        limit,
+        total: totalResult.total,
+        totalPages: Math.ceil(totalResult.total / limit),
+      },
     });
   } catch (error) {
     console.error('Errore nel recupero dei caricatori:', error);

@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { readFile, writeFile, mkdir, access } from 'fs/promises';
 import sharp from 'sharp';
 import path from 'path';
+import { readImageBuffer } from '@/lib/images/heic';
 
 const UPLOAD_DIR = process.env.STORAGE_PATH || './storage';
 
@@ -54,7 +55,7 @@ export const GET = withAuth(async (request: NextRequest, context) => {
     }
 
     try {
-      const originalBuffer = await readFile(slide.storagePath);
+      const originalBuffer = await readImageBuffer(slide.storagePath);
       const thumbnailBuffer = await sharp(originalBuffer)
         .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 80 })

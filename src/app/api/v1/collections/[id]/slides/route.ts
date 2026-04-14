@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth } from '@/lib/auth/middleware';
 import { t } from '@/lib/i18n';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 
 export const POST = withAuth(async (request: NextRequest, context) => {
   try {
@@ -32,37 +32,40 @@ export const POST = withAuth(async (request: NextRequest, context) => {
       );
     }
 
-    let added = 0;
-    for (const slideId of slideIds) {
-      const numericSlideId = Number(slideId);
+    const numericSlideIds = slideIds.map(Number);
 
-      const [existingSlide] = await db
-        .select()
-        .from(schema.slides)
-        .where(eq(schema.slides.id, numericSlideId))
-        .limit(1);
+    // Batch-check which slides actually exist
+    const existingSlides = await db
+      .select({ id: schema.slides.id })
+      .from(schema.slides)
+      .where(inArray(schema.slides.id, numericSlideIds));
+    const validIds = new Set(existingSlides.map((s) => s.id));
 
-      if (!existingSlide) continue;
-
-      const [existingAssoc] = await db
-        .select()
-        .from(schema.slideCollections)
-        .where(
-          and(
-            eq(schema.slideCollections.collectionId, numericId),
-            eq(schema.slideCollections.slideId, numericSlideId)
-          )
+    // Batch-check which associations already exist
+    const existingAssocs = await db
+      .select({ slideId: schema.slideCollections.slideId })
+      .from(schema.slideCollections)
+      .where(
+        and(
+          eq(schema.slideCollections.collectionId, numericId),
+          inArray(schema.slideCollections.slideId, numericSlideIds)
         )
-        .limit(1);
+      );
+    const alreadyLinked = new Set(existingAssocs.map((a) => a.slideId));
 
-      if (existingAssoc) continue;
+    // Filter to only new, valid slides
+    const toInsert = numericSlideIds
+      .filter((id) => validIds.has(id) && !alreadyLinked.has(id));
 
-      await db.insert(schema.slideCollections).values({
-        collectionId: numericId,
-        slideId: numericSlideId,
-      });
-      added++;
+    if (toInsert.length > 0) {
+      await db.insert(schema.slideCollections).values(
+        toInsert.map((slideId) => ({
+          collectionId: numericId,
+          slideId,
+        }))
+      );
     }
+    const added = toInsert.length;
 
     return NextResponse.json({
       success: true,

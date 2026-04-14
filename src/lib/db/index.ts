@@ -7,8 +7,8 @@ const DATABASE_URL =
 
 // Connection pool for queries (multiple connections)
 const queryClient = postgres(DATABASE_URL, {
-  max: 10,
-  idle_timeout: 20,
+  max: 15,
+  idle_timeout: 60,
   connect_timeout: 10,
 });
 

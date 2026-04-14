@@ -1234,6 +1234,38 @@ export default function ImpostazioniPage() {
                             : "Impossibile contattare il server. Inserisci il nome manualmente oppure premi Aggiorna."}
                       </p>
                     </div>
+
+                    {/* Vision model for image description */}
+                    <div className="space-y-2">
+                      <Label htmlFor="ollama-vision-model">Modello Vision (descrizione immagini)</Label>
+                      {ollamaModels.length > 0 ? (
+                        <Select
+                          value={getStr("ollamaVisionModel", "")}
+                          onValueChange={(v) => { if (v) updateField("ollamaVisionModel", v); }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Usa modello chat (predefinito)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ollamaModels.map((model) => (
+                              <SelectItem key={model} value={model}>
+                                {model}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          id="ollama-vision-model"
+                          value={getStr("ollamaVisionModel", "")}
+                          onChange={(e) => updateField("ollamaVisionModel", e.target.value)}
+                          placeholder="llava:7b"
+                        />
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Modello con supporto vision per descrivere le immagini (es. llava, llama3.2-vision). Se vuoto, usa il modello chat.
+                      </p>
+                    </div>
                   </>
                 )}
 
@@ -1248,6 +1280,7 @@ export default function ImpostazioniPage() {
                       aiMaxMonthlyUsd: getNum("aiMaxMonthlyUsd", 5),
                       ollamaUrl: getStr("ollamaUrl", "http://localhost:11434"),
                       ollamaModel: getStr("ollamaModel", "llama3.2"),
+                      ollamaVisionModel: getStr("ollamaVisionModel", ""),
                     })
                   }
                 />

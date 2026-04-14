@@ -184,6 +184,7 @@ export const slides = pgTable(
     index("slides_uploaded_by_idx").on(table.uploadedBy),
     index("slides_date_taken_idx").on(table.dateTakenPrecise),
     index("slides_checksum_idx").on(table.checksum),
+    index("slides_backed_up_idx").on(table.backedUp),
   ]
 );
 

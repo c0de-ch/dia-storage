@@ -48,8 +48,8 @@ export const GET = withAuth(async (request: NextRequest) => {
 
     const slidesWithUrls = slides.map((slide) => ({
       ...slide,
-      thumbnailUrl: slide.thumbnailPath ? `/api/v1/slides/${slide.id}/thumbnail` : null,
-      mediumUrl: slide.mediumPath ? `/api/v1/slides/${slide.id}/medium` : null,
+      thumbnailUrl: slide.storagePath ? `/api/v1/slides/${slide.id}/thumbnail` : null,
+      mediumUrl: slide.storagePath ? `/api/v1/slides/${slide.id}/medium` : null,
     }));
 
     return NextResponse.json({

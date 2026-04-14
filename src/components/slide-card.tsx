@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,7 +16,7 @@ interface SlideCardProps {
   showCheckbox?: boolean;
 }
 
-export function SlideCard({
+export const SlideCard = memo(function SlideCard({
   slide,
   selected = false,
   onSelect,
@@ -109,7 +109,7 @@ export function SlideCard({
       </div>
     </div>
   );
-}
+});
 
 function ThumbnailImage({ slideId, alt }: { slideId: number; alt: string }) {
   const [failed, setFailed] = useState(false);

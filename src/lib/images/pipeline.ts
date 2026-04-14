@@ -188,26 +188,26 @@ export async function archiveSlide(
   // Determine the archive date for directory structure
   const archiveDate = metadata.dateTaken ? new Date(metadata.dateTaken) : new Date();
 
-  // 1. Generate medium-resolution
+  // 1. Prepare destination paths and directories
   const incomingPath = slide.storagePath;
   const mediumDest = getMediumPath(slideId, archiveDate);
-  await ensureDir(dirname(mediumDest));
-  await generateMedium(incomingPath, mediumDest);
-
-  // 2. Move original to permanent location
   const originalDest = getOriginalPath(slideId, archiveDate);
-  await ensureDir(dirname(originalDest));
-  await copyFile(incomingPath, originalDest);
-
-  // Move thumbnail
   const thumbDest = getThumbnailPath(slideId, archiveDate);
-  await ensureDir(dirname(thumbDest));
-  if (slide.thumbnailPath) {
-    await copyFile(slide.thumbnailPath, thumbDest);
-  } else {
-    // Regenerate if path is missing
-    await generateThumbnail(originalDest, thumbDest);
-  }
+
+  await Promise.all([
+    ensureDir(dirname(mediumDest)),
+    ensureDir(dirname(originalDest)),
+    ensureDir(dirname(thumbDest)),
+  ]);
+
+  // 2. Generate medium, copy original, and copy/regenerate thumbnail in parallel
+  await Promise.all([
+    generateMedium(incomingPath, mediumDest),
+    copyFile(incomingPath, originalDest),
+    slide.thumbnailPath
+      ? copyFile(slide.thumbnailPath, thumbDest)
+      : generateThumbnail(incomingPath, thumbDest),
+  ]);
 
   // 4. Write EXIF if date provided
   if (metadata.dateTaken) {

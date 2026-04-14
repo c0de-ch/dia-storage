@@ -21,6 +21,12 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Install heif-convert for HEIC/HEIF image support
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libheif-examples \
+    libheif-plugin-libde265 \
+  && rm -rf /var/lib/apt/lists/*
+
 # Copy built application and production node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public

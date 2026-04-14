@@ -7,7 +7,7 @@ import { Upload } from '@aws-sdk/lib-storage';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { basename } from 'node:path';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
@@ -180,28 +180,18 @@ export async function runIncrementalBackup(): Promise<{
     .returning();
 
   let totalBytes = 0;
+  const backedUpIds: number[] = [];
 
   for (const slide of pending) {
     if (!slide.storagePath) continue;
 
     try {
-      // Derive an S3 key from the storage path
-      // e.g. /data/originals/2024/06/slide_42.jpg -> originals/2024/06/slide_42.jpg
       const key = slide.storagePath.replace(/^\/data\//, '');
       const fileStat = await stat(slide.storagePath);
 
       await uploadToS3(slide.storagePath, key, s3Config);
 
-      // Mark as backed up
-      await db
-        .update(schema.slides)
-        .set({
-          backedUp: true,
-          backedUpAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.slides.id, slide.id));
-
+      backedUpIds.push(slide.id);
       totalBytes += fileStat.size;
       uploaded++;
     } catch (err) {
@@ -210,6 +200,18 @@ export async function runIncrementalBackup(): Promise<{
         error: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+
+  // Batch-update all successfully backed up slides
+  if (backedUpIds.length > 0) {
+    await db
+      .update(schema.slides)
+      .set({
+        backedUp: true,
+        backedUpAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(inArray(schema.slides.id, backedUpIds));
   }
 
   // Update history record

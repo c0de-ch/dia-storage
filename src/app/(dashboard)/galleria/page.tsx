@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   FilterIcon,
@@ -145,7 +145,7 @@ export default function GalleriaPage() {
   }
 
   // Build page numbers for pagination
-  function getPageNumbers(): (number | "ellipsis")[] {
+  const pageNumbers = useMemo((): (number | "ellipsis")[] => {
     if (!pagination) return [];
     const { totalPages } = pagination;
     if (totalPages <= 7) {
@@ -163,7 +163,7 @@ export default function GalleriaPage() {
     if (page < totalPages - 2) pages.push("ellipsis");
     pages.push(totalPages);
     return pages;
-  }
+  }, [pagination, page]);
 
   const hasSelected = selectedIds.size > 0;
 
@@ -291,7 +291,7 @@ export default function GalleriaPage() {
                   className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                 />
               </PaginationItem>
-              {getPageNumbers().map((p, i) =>
+              {pageNumbers.map((p, i) =>
                 p === "ellipsis" ? (
                   <PaginationItem key={`e-${i}`}>
                     <PaginationEllipsis />

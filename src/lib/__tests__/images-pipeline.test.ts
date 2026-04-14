@@ -335,7 +335,7 @@ describe("archiveSlide", () => {
     mockDbSelectLimit.mockResolvedValue([makeSlideRow({ thumbnailPath: null })]);
     await archiveSlide(1, {});
     expect(mockGenerateThumbnail).toHaveBeenCalledWith(
-      "/data/originals/2024/06/slide_1.jpg",
+      "/data/incoming/batch-123/PICT0001.JPG",
       "/data/thumbnails/2024/06/slide_1.jpg",
     );
   });

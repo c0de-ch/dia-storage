@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { t } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -349,6 +349,8 @@ export default function CodaPage() {
     }
   }, []);
 
+  const grouped = useMemo(() => groupByDate(batches), [batches]);
+
   if (loading) {
     return (
       <div className="flex flex-col gap-6">
@@ -364,8 +366,6 @@ export default function CodaPage() {
       </div>
     );
   }
-
-  const grouped = groupByDate(batches);
 
   return (
     <div className="flex flex-col gap-6">

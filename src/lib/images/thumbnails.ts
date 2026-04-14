@@ -1,8 +1,21 @@
 import sharp from 'sharp';
+import { isHeicFile, convertHeicToJpegBuffer } from './heic';
 
 export interface ImageDimensions {
   width: number;
   height: number;
+}
+
+/**
+ * Get a Sharp input for the given file path.
+ * For HEIC files, converts to a JPEG buffer first.
+ * For other formats, passes the file path directly to Sharp (streaming from disk).
+ */
+async function sharpInput(filePath: string): Promise<string | Buffer> {
+  if (isHeicFile(filePath)) {
+    return convertHeicToJpegBuffer(filePath);
+  }
+  return filePath;
 }
 
 /**
@@ -13,7 +26,8 @@ export async function generateThumbnail(
   inputPath: string,
   outputPath: string,
 ): Promise<ImageDimensions> {
-  const info = await sharp(inputPath)
+  const input = await sharpInput(inputPath);
+  const info = await sharp(input)
     .resize({ width: 400, withoutEnlargement: true })
     .jpeg({ quality: 80 })
     .toFile(outputPath);
@@ -29,7 +43,8 @@ export async function generateMedium(
   inputPath: string,
   outputPath: string,
 ): Promise<ImageDimensions> {
-  const info = await sharp(inputPath)
+  const input = await sharpInput(inputPath);
+  const info = await sharp(input)
     .resize({ width: 1600, withoutEnlargement: true })
     .jpeg({ quality: 85 })
     .toFile(outputPath);
@@ -43,7 +58,8 @@ export async function generateMedium(
 export async function getImageDimensions(
   filePath: string,
 ): Promise<ImageDimensions> {
-  const metadata = await sharp(filePath).metadata();
+  const input = await sharpInput(filePath);
+  const metadata = await sharp(input).metadata();
 
   if (!metadata.width || !metadata.height) {
     throw new Error(`Impossibile leggere le dimensioni dell'immagine: ${filePath}`);

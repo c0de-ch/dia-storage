@@ -2,26 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth } from '@/lib/auth/middleware';
-import { eq, count } from 'drizzle-orm';
+import { count, sql } from 'drizzle-orm';
 
 export const GET = withAuth(async (_request: NextRequest) => {
   try {
-    const [totalResult] = await db
-      .select({ total: count() })
-      .from(schema.slides);
-
-    const [incomingResult] = await db
-      .select({ total: count() })
-      .from(schema.slides)
-      .where(eq(schema.slides.status, 'incoming'));
-
-    const [magazinesResult] = await db
-      .select({ total: count() })
-      .from(schema.magazines);
+    const [[slideStats], [magazinesResult]] = await Promise.all([
+      db
+        .select({
+          total: count(),
+          incoming: sql<number>`sum(case when ${schema.slides.status} = 'incoming' then 1 else 0 end)::int`,
+        })
+        .from(schema.slides),
+      db
+        .select({ total: count() })
+        .from(schema.magazines),
+    ]);
 
     return NextResponse.json({
-      totalSlides: totalResult.total,
-      incomingCount: incomingResult.total,
+      totalSlides: slideStats.total,
+      incomingCount: slideStats.incoming ?? 0,
       magazinesCount: magazinesResult.total,
     });
   } catch (error) {
