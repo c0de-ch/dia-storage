@@ -42,6 +42,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Dia-Uploader deve accedere alla scheda SD per leggere le diapositive scansionate.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright 2026 c0de.ch. Tutti i diritti riservati.</string>
 </dict>

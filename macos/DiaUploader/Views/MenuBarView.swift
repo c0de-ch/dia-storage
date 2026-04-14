@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
@@ -27,6 +28,8 @@ struct MenuBarView: View {
                     .environmentObject(uploadService)
             } else if let volume = appState.detectedVolume, !appState.detectedFiles.isEmpty {
                 sdCardDetectedView(volume: volume)
+            } else if let volume = appState.detectedVolume {
+                emptyVolumeView(volume: volume)
             } else {
                 idleView
             }
@@ -163,6 +166,48 @@ struct MenuBarView: View {
         }
     }
 
+    // MARK: - Empty Volume (detected but no files matched)
+
+    private func emptyVolumeView(volume: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "sdcard.fill")
+                    .foregroundColor(.blue)
+                Text("Scheda SD rilevata")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+
+            Text("\"\(volume)\" — nessuna diapositiva trovata automaticamente.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            Text("I file potrebbero trovarsi in una cartella non standard. Usa il pulsante qui sotto per selezionarli manualmente.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            Button(action: browseFiles) {
+                HStack {
+                    Image(systemName: "folder.badge.plus")
+                    Text("Sfoglia e seleziona file...")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+
+            Button(action: {
+                appState.clearDetectedVolume()
+            }) {
+                HStack {
+                    Image(systemName: "eject")
+                    Text("Ignora scheda")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
     // MARK: - Idle State
 
     private var idleView: some View {
@@ -179,6 +224,15 @@ struct MenuBarView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+
+            Button(action: browseFiles) {
+                HStack {
+                    Image(systemName: "folder.badge.plus")
+                    Text("Oppure seleziona file manualmente...")
+                }
+            }
+            .buttonStyle(.bordered)
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
@@ -310,6 +364,55 @@ struct MenuBarView: View {
     private func openSettings() {
         NSApp.activate(ignoringOtherApps: true)
         openWindow(id: "settings")
+    }
+
+    private func browseFiles() {
+        NSApp.activate(ignoringOtherApps: true)
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = [.image]
+        panel.message = "Seleziona le diapositive da caricare"
+        panel.prompt = "Seleziona"
+
+        // Start in the SD card if detected
+        if let volumeURL = appState.detectedVolumeURL {
+            panel.directoryURL = volumeURL
+        }
+
+        if panel.runModal() == .OK {
+            var files: [URL] = []
+            for url in panel.urls {
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+                    // Scan directory for images
+                    if let contents = try? FileManager.default.contentsOfDirectory(
+                        at: url,
+                        includingPropertiesForKeys: nil,
+                        options: [.skipsHiddenFiles]
+                    ) {
+                        let imageExts: Set<String> = ["jpg", "jpeg", "png", "tiff", "tif", "heic", "heif", "gif", "bmp", "webp"]
+                        files.append(contentsOf: contents.filter { imageExts.contains($0.pathExtension.lowercased()) })
+                    }
+                } else {
+                    files.append(url)
+                }
+            }
+
+            guard !files.isEmpty else { return }
+
+            let totalSize = files.reduce(Int64(0)) { total, url in
+                let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+                return total + size
+            }
+
+            appState.detectedVolume = appState.detectedVolume ?? "File selezionati"
+            appState.detectedFiles = files.sorted { $0.lastPathComponent < $1.lastPathComponent }
+            appState.totalFileSize = totalSize
+            selectedFiles = Set(appState.detectedFiles)
+        }
     }
 }
 

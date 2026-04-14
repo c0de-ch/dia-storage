@@ -138,21 +138,9 @@ final class FileScanner {
         let ext = fileURL.pathExtension.lowercased()
         guard allowedExtensions.contains(ext) else { return false }
 
-        // Accept any supported file inside a DCIM directory tree
-        if fileURL.path.uppercased().contains("/DCIM/") {
-            return true
-        }
-
-        // Outside DCIM, require a known camera/scanner prefix
-        let nameWithoutExt = (fileURL.lastPathComponent as NSString)
-            .deletingPathExtension.uppercased()
-
-        for pattern in patterns {
-            if nameWithoutExt.hasPrefix(pattern) {
-                return true
-            }
-        }
-
-        return false
+        // Accept any image/video file with a supported extension on removable media.
+        // The scanner is used specifically for removable volumes (SD cards, USB drives),
+        // so being permissive is the right default — the user can deselect files in the UI.
+        return true
     }
 }

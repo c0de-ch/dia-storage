@@ -98,14 +98,15 @@ final class VolumeWatcher: ObservableObject {
         let scanner = FileScanner()
         let (files, totalSize) = scanner.scanForSlides(at: volumeURL)
 
-        guard !files.isEmpty else { return }
-
         await MainActor.run {
             appState?.detectedVolume = volumeName
+            appState?.detectedVolumeURL = volumeURL
             appState?.detectedFiles = files
             appState?.totalFileSize = totalSize
 
-            onVolumeDetected?(volumeName, files, totalSize)
+            if !files.isEmpty {
+                onVolumeDetected?(volumeName, files, totalSize)
+            }
 
             // Send notification
             NotificationService.shared.showSDCardDetected(

@@ -42,6 +42,7 @@ final class AppState: ObservableObject {
     // MARK: - Volume Detection
 
     @Published var detectedVolume: String?
+    @Published var detectedVolumeURL: URL?
     @Published var detectedFiles: [URL] = []
     @Published var totalFileSize: Int64 = 0
 
@@ -116,6 +117,7 @@ final class AppState: ObservableObject {
 
     func clearDetectedVolume() {
         detectedVolume = nil
+        detectedVolumeURL = nil
         detectedFiles = []
         totalFileSize = 0
     }
