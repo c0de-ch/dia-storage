@@ -6,6 +6,10 @@ struct MenuBarView: View {
     @EnvironmentObject var uploadService: UploadService
     @Environment(\.openWindow) private var openWindow
 
+    @State private var selectedFiles: Set<URL> = []
+    @State private var showCompletion = false
+    @State private var lastUploadCount = 0
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
@@ -14,7 +18,9 @@ struct MenuBarView: View {
             Divider()
 
             // Main content area
-            if appState.isUploading {
+            if showCompletion {
+                completionView
+            } else if appState.isUploading {
                 UploadProgressView()
                     .environmentObject(appState)
                     .environmentObject(uploadService)
@@ -41,6 +47,18 @@ struct MenuBarView: View {
             if appState.needsSetup {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     openSettings()
+                }
+            }
+        }
+        .onChange(of: appState.detectedFiles) { _, newFiles in
+            selectedFiles = Set(newFiles)
+        }
+        .onChange(of: appState.isUploading) { oldValue, newValue in
+            if oldValue && !newValue {
+                // Upload just finished
+                if let lastUpload = appState.recentUploads.first, lastUpload.success {
+                    lastUploadCount = lastUpload.count
+                    showCompletion = true
                 }
             }
         }
@@ -75,6 +93,7 @@ struct MenuBarView: View {
 
     private func sdCardDetectedView(volume: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Header
             HStack {
                 Image(systemName: "sdcard.fill")
                     .foregroundColor(.blue)
@@ -83,11 +102,7 @@ struct MenuBarView: View {
                     .fontWeight(.medium)
             }
 
-            Text("Trovate \(appState.detectedFiles.count) diapositive su \"\(volume)\"")
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            Text("Dimensione totale: \(appState.formattedTotalSize)")
+            Text("\(appState.detectedFiles.count) diapositive su \"\(volume)\" — \(appState.formattedTotalSize)")
                 .font(.caption)
                 .foregroundColor(.secondary)
 
@@ -100,19 +115,49 @@ struct MenuBarView: View {
                         .font(.caption)
                         .foregroundColor(.orange)
                 }
-                .padding(.top, 4)
             }
 
+            Divider()
+
+            // Select all toggle
+            HStack {
+                Button(action: toggleSelectAll) {
+                    HStack(spacing: 4) {
+                        Image(systemName: selectedFiles.count == appState.detectedFiles.count ? "checkmark.square.fill" : "square")
+                            .foregroundColor(.accentColor)
+                        Text(selectedFiles.count == appState.detectedFiles.count ? "Deseleziona tutti" : "Seleziona tutti")
+                            .font(.caption)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text("\(selectedFiles.count) di \(appState.detectedFiles.count) selezionate")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            // File list (scrollable, max ~200px height)
+            ScrollView {
+                VStack(spacing: 2) {
+                    ForEach(appState.detectedFiles, id: \.self) { file in
+                        FileRow(file: file, isSelected: selectedFiles.contains(file), onToggle: { toggleFile(file) })
+                    }
+                }
+            }
+            .frame(maxHeight: 200)
+
+            // Upload button
             Button(action: startUpload) {
                 HStack {
                     Image(systemName: "arrow.up.circle.fill")
-                    Text("Carica diapositive")
+                    Text("Carica \(selectedFiles.count) diapositive")
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!appState.isConnected)
-            .padding(.top, 4)
+            .disabled(!appState.isConnected || selectedFiles.isEmpty)
         }
     }
 
@@ -196,19 +241,110 @@ struct MenuBarView: View {
         }
     }
 
+    // MARK: - Completion View
+
+    private var completionView: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.largeTitle)
+                .foregroundColor(.green)
+
+            Text("Caricamento completato")
+                .font(.subheadline)
+                .fontWeight(.medium)
+
+            Text("\(lastUploadCount) diapositive caricate")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            HStack(spacing: 8) {
+                Button("Apri coda") {
+                    if let url = URL(string: appState.serverURL + "/coda") {
+                        NSWorkspace.shared.open(url)
+                    }
+                    showCompletion = false
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("Chiudi") {
+                    showCompletion = false
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+    }
+
     // MARK: - Actions
 
     private func startUpload() {
+        let filesToUpload = Array(selectedFiles).sorted { $0.lastPathComponent < $1.lastPathComponent }
         Task {
             await uploadService.uploadFiles(
-                files: appState.detectedFiles,
+                files: filesToUpload,
                 appState: appState
             )
+        }
+    }
+
+    private func toggleSelectAll() {
+        if selectedFiles.count == appState.detectedFiles.count {
+            selectedFiles.removeAll()
+        } else {
+            selectedFiles = Set(appState.detectedFiles)
+        }
+    }
+
+    private func toggleFile(_ file: URL) {
+        if selectedFiles.contains(file) {
+            selectedFiles.remove(file)
+        } else {
+            selectedFiles.insert(file)
         }
     }
 
     private func openSettings() {
         NSApp.activate(ignoringOtherApps: true)
         openWindow(id: "settings")
+    }
+}
+
+// MARK: - File Row
+
+private struct FileRow: View {
+    let file: URL
+    let isSelected: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(spacing: 6) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                    .font(.caption)
+
+                Text(file.lastPathComponent)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Spacer()
+
+                Text(fileSizeString(file))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 2)
+            .padding(.horizontal, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func fileSizeString(_ url: URL) -> String {
+        let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+        return ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
     }
 }
