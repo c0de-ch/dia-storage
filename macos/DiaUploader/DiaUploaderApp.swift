@@ -22,27 +22,24 @@ struct DiaUploaderApp: App {
                     hasInitialized = true
                     setupVolumeWatcher()
 
-                    if appState.needsSetup {
-                        // First launch — open settings immediately
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            NSApp.activate(ignoringOtherApps: true)
-                            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                        }
-                    } else {
+                    if !appState.needsSetup {
                         await checkInitialConnection()
                     }
                 }
         } label: {
-            Label("Dia-Uploader", systemImage: appState.isUploading ? "arrow.up.circle.fill" : "film")
+            let icon = appState.isUploading ? "MenuBarIconUploading" : "MenuBarIcon"
+            Image(icon)
+                .renderingMode(.template)
         }
         .menuBarExtraStyle(.window)
         .handlesExternalEvents(matching: ["dia-uploader"])
 
-        Settings {
+        Window("Impostazioni", id: "settings") {
             SettingsView()
                 .environmentObject(appState)
                 .environmentObject(uploadService)
         }
+        .windowResizability(.contentSize)
     }
 
     // MARK: - Setup

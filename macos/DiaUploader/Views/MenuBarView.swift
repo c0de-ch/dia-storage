@@ -4,6 +4,7 @@ struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var volumeWatcher: VolumeWatcher
     @EnvironmentObject var uploadService: UploadService
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -36,6 +37,13 @@ struct MenuBarView: View {
         }
         .padding(16)
         .frame(width: 320)
+        .onAppear {
+            if appState.needsSetup {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    openSettings()
+                }
+            }
+        }
     }
 
     // MARK: - Header
@@ -200,9 +208,7 @@ struct MenuBarView: View {
     }
 
     private func openSettings() {
-        // Activate the app first — essential for MenuBarExtra apps
         NSApp.activate(ignoringOtherApps: true)
-        // showSettingsWindow: available since macOS 13
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        openWindow(id: "settings")
     }
 }
