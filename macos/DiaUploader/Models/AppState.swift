@@ -22,13 +22,7 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(serverURL, forKey: "serverURL") }
     }
 
-    @Published var apiKey: String = "" {
-        didSet {
-            if !serverURL.isEmpty {
-                KeychainService.save(key: apiKey, forServer: serverURL)
-            }
-        }
-    }
+    @Published var apiKey: String = ""
 
     // MARK: - Connection State
 
@@ -94,6 +88,11 @@ final class AppState: ObservableObject {
            let uploads = try? JSONDecoder().decode([RecentUpload].self, from: data) {
             self.recentUploads = uploads
         }
+    }
+
+    /// True when the app has never been configured (first launch).
+    var needsSetup: Bool {
+        serverURL.isEmpty || apiKey.isEmpty
     }
 
     // MARK: - Methods

@@ -157,13 +157,13 @@ struct SettingsView: View {
         appState.autoEject = autoEject
         appState.autoUpload = autoUpload
 
-        // Save API key to Keychain
-        if !serverURL.isEmpty && !apiKey.isEmpty {
-            KeychainService.save(key: apiKey, forServer: serverURL)
-        }
-
-        // Check connection after saving
-        Task {
+        // Save API key to Keychain off the main thread, then test connection
+        let url = serverURL
+        let key = apiKey
+        Task.detached {
+            if !url.isEmpty && !key.isEmpty {
+                KeychainService.save(key: key, forServer: url)
+            }
             await checkConnection()
         }
     }

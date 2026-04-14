@@ -21,7 +21,16 @@ struct DiaUploaderApp: App {
                     guard !hasInitialized else { return }
                     hasInitialized = true
                     setupVolumeWatcher()
-                    await checkInitialConnection()
+
+                    if appState.needsSetup {
+                        // First launch — open settings immediately
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            NSApp.activate(ignoringOtherApps: true)
+                            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                        }
+                    } else {
+                        await checkInitialConnection()
+                    }
                 }
         } label: {
             Label("Dia-Uploader", systemImage: appState.isUploading ? "arrow.up.circle.fill" : "film")
