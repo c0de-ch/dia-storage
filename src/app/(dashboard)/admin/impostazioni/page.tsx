@@ -3,9 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  AppWindow,
-  Archive,
-  Bell,
   BotIcon,
   CheckCircle2,
   Clock,
@@ -24,8 +21,6 @@ import {
   Save,
   Send,
   Server,
-  Settings2,
-  Shield,
   Trash2,
 } from "lucide-react";
 
@@ -47,6 +42,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import {
   Progress,
   ProgressLabel,
@@ -65,67 +62,6 @@ interface ApiKey {
   createdAt: string;
   lastUsedAt: string | null;
 }
-
-type TabId =
-  | "generale"
-  | "autenticazione"
-  | "chiavi-api"
-  | "email"
-  | "whatsapp"
-  | "archiviazione"
-  | "backup-s3"
-  | "backup-nas"
-  | "pianificazione"
-  | "assistente-ia";
-
-interface NavGroup {
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  items: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }[];
-}
-
-const navGroups: NavGroup[] = [
-  {
-    label: "Applicazione",
-    icon: AppWindow,
-    items: [
-      { id: "generale", label: "Generale", icon: Globe },
-    ],
-  },
-  {
-    label: "Sicurezza",
-    icon: Shield,
-    items: [
-      { id: "autenticazione", label: "Autenticazione", icon: Lock },
-      { id: "chiavi-api", label: "Chiavi API", icon: Key },
-    ],
-  },
-  {
-    label: "Notifiche",
-    icon: Bell,
-    items: [
-      { id: "email", label: "Email SMTP", icon: Mail },
-      { id: "whatsapp", label: "WhatsApp", icon: MessageSquare },
-    ],
-  },
-  {
-    label: "Archivio",
-    icon: Archive,
-    items: [
-      { id: "archiviazione", label: "Archiviazione", icon: HardDrive },
-      { id: "backup-s3", label: "Backup S3", icon: Server },
-      { id: "backup-nas", label: "Backup NAS", icon: HardDrive },
-      { id: "pianificazione", label: "Pianificazione", icon: Clock },
-    ],
-  },
-  {
-    label: "Avanzate",
-    icon: Settings2,
-    items: [
-      { id: "assistente-ia", label: "Assistente IA", icon: BotIcon },
-    ],
-  },
-];
 
 // ---------------------------------------------------------------------------
 // Masked field component
@@ -202,7 +138,6 @@ export default function ImpostazioniPage() {
   const [config, setConfig] = useState<ConfigMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>("generale");
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
 
@@ -396,65 +331,71 @@ export default function ImpostazioniPage() {
         </p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-6">
-        {/* --- Vertical sidebar nav (desktop) / horizontal scroll (mobile) --- */}
-        <nav className="shrink-0 sm:w-56 sm:border-r sm:pr-4">
-          {/* Mobile: horizontal scrollable row */}
-          <div className="flex gap-1 overflow-x-auto pb-2 sm:hidden">
-            {navGroups.flatMap((g) =>
-              g.items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                      activeTab === item.id
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
-                    }`}
-                  >
-                    <Icon className="size-3.5" />
-                    {item.label}
-                  </button>
-                );
-              })
-            )}
-          </div>
+      <Tabs defaultValue="generale" className="space-y-4">
+        <div className="overflow-x-auto -mx-1 px-1">
+          <TabsList className="inline-flex h-auto flex-wrap gap-1 bg-muted/50 p-1.5 rounded-xl">
+            {/* Group: Applicazione */}
+            <TabsTrigger value="generale" className="gap-1.5 rounded-lg px-3 py-2 data-[state=active]:shadow-sm">
+              <Globe className="size-3.5" />
+              Generale
+            </TabsTrigger>
 
-          {/* Desktop: vertical grouped nav */}
-          <div className="hidden sm:block space-y-1">
-            {navGroups.map((group) => (
-              <div key={group.label}>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 pt-4 pb-1">
-                  {group.label}
-                </p>
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center gap-2 text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                        activeTab === item.id
-                          ? "bg-accent text-accent-foreground font-medium"
-                          : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
-                      }`}
-                    >
-                      <Icon className="size-4" />
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </nav>
+            <Separator orientation="vertical" className="!h-6 mx-1" />
 
-        {/* --- Content panel --- */}
-        <div className="flex-1 min-w-0">
+            {/* Group: Sicurezza */}
+            <TabsTrigger value="autenticazione" className="gap-1.5 rounded-lg px-3 py-2 data-[state=active]:shadow-sm">
+              <Lock className="size-3.5" />
+              Autenticazione
+            </TabsTrigger>
+            <TabsTrigger value="chiavi-api" className="gap-1.5 rounded-lg px-3 py-2 data-[state=active]:shadow-sm">
+              <Key className="size-3.5" />
+              Chiavi API
+            </TabsTrigger>
+
+            <Separator orientation="vertical" className="!h-6 mx-1" />
+
+            {/* Group: Notifiche */}
+            <TabsTrigger value="email" className="gap-1.5 rounded-lg px-3 py-2 data-[state=active]:shadow-sm">
+              <Mail className="size-3.5" />
+              Email SMTP
+            </TabsTrigger>
+            <TabsTrigger value="whatsapp" className="gap-1.5 rounded-lg px-3 py-2 data-[state=active]:shadow-sm">
+              <MessageSquare className="size-3.5" />
+              WhatsApp
+            </TabsTrigger>
+
+            <Separator orientation="vertical" className="!h-6 mx-1" />
+
+            {/* Group: Archivio */}
+            <TabsTrigger value="archiviazione" className="gap-1.5 rounded-lg px-3 py-2 data-[state=active]:shadow-sm">
+              <HardDrive className="size-3.5" />
+              Archiviazione
+            </TabsTrigger>
+            <TabsTrigger value="backup-s3" className="gap-1.5 rounded-lg px-3 py-2 data-[state=active]:shadow-sm">
+              <Server className="size-3.5" />
+              Backup S3
+            </TabsTrigger>
+            <TabsTrigger value="backup-nas" className="gap-1.5 rounded-lg px-3 py-2 data-[state=active]:shadow-sm">
+              <HardDrive className="size-3.5" />
+              Backup NAS
+            </TabsTrigger>
+            <TabsTrigger value="pianificazione" className="gap-1.5 rounded-lg px-3 py-2 data-[state=active]:shadow-sm">
+              <Clock className="size-3.5" />
+              Pianificazione
+            </TabsTrigger>
+
+            <Separator orientation="vertical" className="!h-6 mx-1" />
+
+            {/* Group: Avanzate */}
+            <TabsTrigger value="assistente-ia" className="gap-1.5 rounded-lg px-3 py-2 data-[state=active]:shadow-sm">
+              <BotIcon className="size-3.5" />
+              Assistente IA
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
           {/* ---- Generale ---- */}
-          {activeTab === "generale" && (
+          <TabsContent value="generale">
             <Card>
               <CardHeader>
                 <CardTitle>Impostazioni generali</CardTitle>
@@ -517,10 +458,10 @@ export default function ImpostazioniPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          </TabsContent>
 
           {/* ---- Autenticazione ---- */}
-          {activeTab === "autenticazione" && (
+          <TabsContent value="autenticazione">
             <Card>
               <CardHeader>
                 <CardTitle>Autenticazione</CardTitle>
@@ -605,10 +546,10 @@ export default function ImpostazioniPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          </TabsContent>
 
           {/* ---- Chiavi API ---- */}
-          {activeTab === "chiavi-api" && (
+          <TabsContent value="chiavi-api">
             <Card>
               <CardHeader>
                 <CardTitle>Chiavi API</CardTitle>
@@ -719,10 +660,10 @@ export default function ImpostazioniPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          </TabsContent>
 
           {/* ---- Email SMTP ---- */}
-          {activeTab === "email" && (
+          <TabsContent value="email">
             <Card>
               <CardHeader>
                 <CardTitle>Email SMTP</CardTitle>
@@ -840,10 +781,10 @@ export default function ImpostazioniPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          </TabsContent>
 
           {/* ---- WhatsApp ---- */}
-          {activeTab === "whatsapp" && (
+          <TabsContent value="whatsapp">
             <Card>
               <CardHeader>
                 <CardTitle>WhatsApp</CardTitle>
@@ -927,10 +868,10 @@ export default function ImpostazioniPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          </TabsContent>
 
           {/* ---- Archiviazione ---- */}
-          {activeTab === "archiviazione" && (
+          <TabsContent value="archiviazione">
             <Card>
               <CardHeader>
                 <CardTitle>Archiviazione</CardTitle>
@@ -1060,10 +1001,10 @@ export default function ImpostazioniPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          </TabsContent>
 
           {/* ---- Backup S3 ---- */}
-          {activeTab === "backup-s3" && (
+          <TabsContent value="backup-s3">
             <Card>
               <CardHeader>
                 <CardTitle>Backup S3</CardTitle>
@@ -1170,10 +1111,10 @@ export default function ImpostazioniPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          </TabsContent>
 
           {/* ---- Backup NAS ---- */}
-          {activeTab === "backup-nas" && (
+          <TabsContent value="backup-nas">
             <Card>
               <CardHeader>
                 <CardTitle>Backup NAS</CardTitle>
@@ -1245,10 +1186,10 @@ export default function ImpostazioniPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          </TabsContent>
 
           {/* ---- Pianificazione ---- */}
-          {activeTab === "pianificazione" && (
+          <TabsContent value="pianificazione">
             <Card>
               <CardHeader>
                 <CardTitle>Pianificazione backup</CardTitle>
@@ -1310,10 +1251,10 @@ export default function ImpostazioniPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          </TabsContent>
 
           {/* ---- Assistente IA ---- */}
-          {activeTab === "assistente-ia" && (
+          <TabsContent value="assistente-ia">
             <Card>
               <CardHeader>
                 <CardTitle>Assistente IA (Claude)</CardTitle>
@@ -1559,9 +1500,8 @@ export default function ImpostazioniPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
-        </div>
-      </div>
+          </TabsContent>
+      </Tabs>
     </div>
   );
 }
