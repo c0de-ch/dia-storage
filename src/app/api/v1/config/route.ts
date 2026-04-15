@@ -13,6 +13,7 @@ const SENSITIVE_FIELDS = [
   'nasPassword',
   'anthropicApiKey',
   'ollamaApiKey',
+  'googleMapsApiKey',
 ];
 
 function maskSensitiveFields(config: Record<string, unknown>): Record<string, unknown> {

@@ -29,6 +29,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
 } from "lucide-react";
+import { LocationPicker } from "@/components/location-picker";
 
 interface BatchSlide {
   id: string;
@@ -222,11 +223,11 @@ function BatchCard({
             <Label htmlFor={`loc-${batch.id}`}>
               {t("metadata.location")}
             </Label>
-            <Input
+            <LocationPicker
               id={`loc-${batch.id}`}
-              placeholder={t("metadata.noLocation")}
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              onChange={setLocation}
+              placeholder="Cerca un luogo..."
             />
           </div>
           <div className="flex flex-col gap-1.5">

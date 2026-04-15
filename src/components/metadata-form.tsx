@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { DatePickerIt } from "@/components/date-picker-it";
+import { LocationPicker } from "@/components/location-picker";
 
 interface MetadataFormValues {
   title: string;
@@ -142,11 +143,11 @@ export function MetadataForm({
       {/* Location */}
       <div className="space-y-1.5">
         <Label htmlFor="meta-location">Luogo</Label>
-        <Input
+        <LocationPicker
           id="meta-location"
           value={values.location}
-          onChange={(e) => handleChange("location", e.target.value)}
-          placeholder="Luogo della foto"
+          onChange={(v) => handleChange("location", v)}
+          placeholder="Cerca un luogo..."
         />
       </div>
 
