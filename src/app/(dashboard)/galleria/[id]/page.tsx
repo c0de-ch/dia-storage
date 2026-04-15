@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  ArchiveIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   EyeIcon,
@@ -50,6 +51,7 @@ export default function SlideDetailPage() {
   const [siblings, setSiblings] = useState<Slide[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [archivingSlide, setArchivingSlide] = useState(false);
   const [describing, setDescribing] = useState(false);
   const [description, setDescription] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
@@ -130,6 +132,26 @@ export default function SlideDetailPage() {
       console.error("Errore nell'eliminazione:", error);
     } finally {
       setDeleting(false);
+    }
+  }
+
+  // Archive (move to backup)
+  async function handleArchive() {
+    setArchivingSlide(true);
+    try {
+      const res = await fetch(`/api/v1/slides/${slideId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "archived" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        router.push("/galleria");
+      }
+    } catch (error) {
+      console.error("Errore nell'archiviazione:", error);
+    } finally {
+      setArchivingSlide(false);
     }
   }
 
@@ -338,6 +360,26 @@ export default function SlideDetailPage() {
             scanDate={slide.scanDate}
             createdAt={slide.createdAt}
           />
+
+          {/* Archive to backup */}
+          {slide.status === "active" && (
+            <div className="border-t pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={handleArchive}
+                disabled={archivingSlide}
+              >
+                {archivingSlide ? (
+                  <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
+                ) : (
+                  <ArchiveIcon className="mr-1.5 size-3.5" />
+                )}
+                Archivia nel backup
+              </Button>
+            </div>
+          )}
 
           {/* Delete */}
           <div className="border-t pt-4">

@@ -8,6 +8,10 @@ vi.mock("@/lib/db/schema", () => ({
   apiKeys: {},
 }));
 
+vi.mock("fs/promises", () => ({
+  rm: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/lib/i18n", () => ({ t: vi.fn((k: string) => k) }));
 
 vi.mock("@/lib/auth/session", () => ({
@@ -54,18 +58,17 @@ describe("POST /api/v1/slides/batch/delete", () => {
     expect(response.status).toBe(404);
   });
 
-  it("soft-deletes all incoming slides in the batch", async () => {
+  it("hard-deletes all incoming slides in the batch", async () => {
     const slides = [
-      { id: 1, batchId: "batch-1", status: "incoming" },
-      { id: 2, batchId: "batch-1", status: "incoming" },
+      { id: 1, batchId: "batch-1", status: "incoming", storagePath: null, thumbnailPath: null, mediumPath: null },
+      { id: 2, batchId: "batch-1", status: "incoming", storagePath: null, thumbnailPath: null, mediumPath: null },
     ];
 
     const mockWhere = vi.fn().mockResolvedValue(slides);
     vi.mocked(db.select).mockReturnValue({ from: vi.fn().mockReturnValue({ where: mockWhere }) } as never);
 
-    const mockUpdateWhere = vi.fn().mockResolvedValue({});
-    const mockUpdateSet = vi.fn().mockReturnValue({ where: mockUpdateWhere });
-    vi.mocked(db.update).mockReturnValue({ set: mockUpdateSet } as never);
+    const mockDeleteWhere = vi.fn().mockResolvedValue({});
+    vi.mocked(db.delete).mockReturnValue({ where: mockDeleteWhere } as never);
 
     const response = await deletePost(makeRequest({ batchId: "batch-1" }));
     const body = await response.json();
@@ -73,6 +76,7 @@ describe("POST /api/v1/slides/batch/delete", () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.count).toBe(2);
+    expect(db.delete).toHaveBeenCalled();
   });
 });
 

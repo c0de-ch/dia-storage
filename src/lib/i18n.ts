@@ -70,6 +70,8 @@ const translations = {
     rename: "Rinomina",
     duplicate: "Duplica",
     archive: "Archivia",
+    publish: "Pubblica",
+    publishAll: "Pubblica tutto",
     restore: "Ripristina",
     export: "Esporta",
     import: "Importa",
@@ -212,6 +214,16 @@ const translations = {
   gallery: {
     title: "Galleria",
     subtitle: "Tutte le diapositive digitalizzate",
+    allPhotos: "Tutte le foto",
+    albums: "Album",
+    filterByDate: "Filtra per data",
+    filterByLocation: "Filtra per luogo",
+    filterByCollection: "Filtra per album",
+    archiveSelected: "Archivia selezionate",
+    archiveConfirm: "Le diapositive selezionate verranno archiviate e spostate nel backup. Continuare?",
+    archiveSuccess: "Diapositive archiviate con successo",
+    noAlbums: "Nessun album. Crea il primo dalla galleria.",
+    createAlbum: "Nuovo album",
     noSlides: "Nessuna diapositiva trovata",
     noSlidesHint: "Carica le prime diapositive per iniziare",
     slideCount: "{count} diapositive",
@@ -370,7 +382,7 @@ const translations = {
   // ---------------------------------------------------------------------------
   queue: {
     title: "Coda di elaborazione",
-    subtitle: "Diapositive in attesa di elaborazione",
+    subtitle: "Diapositive caricate in attesa di essere pubblicate nella galleria",
     noItems: "Nessun elemento in coda",
     noItemsHint: "Le nuove diapositive caricate appariranno qui",
     processing: "In elaborazione...",
@@ -643,6 +655,8 @@ const translations = {
     sessionRevoked: "Sessione revocata",
     allSessionsRevoked: "Tutte le sessioni revocate",
     slidesProcessed: "Diapositive elaborate",
+    slidesPublished: "Diapositive pubblicate nella galleria",
+    slidesArchived: "Diapositive archiviate nel backup",
     metadataUpdated: "Metadati aggiornati",
     exifExtracted: "Dati EXIF estratti",
     thumbnailGenerated: "Miniatura generata",
@@ -656,6 +670,8 @@ const translations = {
     deleteMessage: "Questa azione non può essere annullata. Continuare?",
     archiveTitle: "Conferma archiviazione",
     archiveMessage: "Vuoi archiviare gli elementi selezionati?",
+    publishTitle: "Conferma pubblicazione",
+    publishMessage: "Vuoi pubblicare queste diapositive nella galleria?",
     logoutTitle: "Conferma uscita",
     logoutMessage: "Sei sicuro di voler uscire?",
     unsavedChanges: "Hai modifiche non salvate. Vuoi davvero uscire?",
@@ -729,11 +745,11 @@ const translations = {
     panoramica:
       "La panoramica mostra un riepilogo generale del sistema: statistiche sulle diapositive, lo stato della coda e le attività recenti.",
     coda:
-      "La coda in arrivo contiene le diapositive appena caricate, in attesa di essere elaborate e archiviate nell'archivio permanente.",
+      "La coda in arrivo contiene le diapositive appena caricate. Puoi impostare titolo e dettagli per tutto il lotto, modificare le singole foto, e poi pubblicarle nella galleria.",
     caricamento:
       "Da qui puoi caricare nuove immagini scansionate dal tuo Reflecta DigitDia, trascinandole o selezionandole dal computer.",
     galleria:
-      "La galleria mostra tutte le diapositive archiviate. Puoi sfogliarle, filtrarle per collezione o caricatore, e modificare i metadati.",
+      "La galleria mostra tutte le diapositive pubblicate. Puoi visualizzarle tutte o per album, filtrarle per data, luogo o tag, e archiviarle nel backup.",
     ricerca:
       "La ricerca ti permette di trovare diapositive per titolo, luogo, note o qualsiasi testo nei metadati, usando la ricerca full-text.",
     utenti:

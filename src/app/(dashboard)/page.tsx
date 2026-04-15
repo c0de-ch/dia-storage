@@ -43,7 +43,7 @@ export default function DashboardPage() {
       try {
         const [statsRes, slidesRes] = await Promise.all([
           fetch("/api/v1/dashboard/stats", { credentials: "include" }),
-          fetch("/api/v1/slides?limit=10&sortBy=createdAt&sortOrder=desc", {
+          fetch("/api/v1/slides?status=active&limit=10&sortBy=createdAt&sortOrder=desc", {
             credentials: "include",
           }),
         ]);
@@ -131,7 +131,7 @@ export default function DashboardPage() {
 
       {/* Recent slides */}
       <div>
-        <h2 className="mb-4 text-lg font-semibold">Diapositive recenti</h2>
+        <h2 className="mb-4 text-lg font-semibold">Ultime pubblicate</h2>
         {loading ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {Array.from({ length: 10 }).map((_, i) => (

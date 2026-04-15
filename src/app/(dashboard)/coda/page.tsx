@@ -20,12 +20,14 @@ import { Separator } from "@/components/ui/separator";
 import {
   InboxIcon,
   ImageIcon,
-  ArchiveIcon,
+  SendIcon,
   PencilIcon,
   Trash2Icon,
   Loader2Icon,
   MonitorIcon,
   LaptopIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from "lucide-react";
 
 interface BatchSlide {
@@ -82,33 +84,33 @@ function SourceIcon({ source }: { source: string }) {
 
 function BatchCard({
   batch,
-  onArchive,
+  onPublish,
   onDelete,
 }: {
   batch: Batch;
-  onArchive: (id: string, meta: BatchMeta) => void;
+  onPublish: (id: string, meta: BatchMeta) => void;
   onDelete: (id: string) => void;
 }) {
-  const [magazineName, setMagazineName] = useState(batch.magazineName ?? "");
+  const [title, setTitle] = useState(batch.magazineName ?? "");
   const [date, setDate] = useState(batch.date ?? "");
   const [location, setLocation] = useState(batch.location ?? "");
   const [notes, setNotes] = useState(batch.notes ?? "");
-  const [applyToAll, setApplyToAll] = useState(false);
-  const [archiving, setArchiving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
-  async function handleArchive() {
-    setArchiving(true);
+  async function handlePublish() {
+    setPublishing(true);
     try {
-      await onArchive(batch.id, {
-        magazineName,
+      await onPublish(batch.id, {
+        magazineName: title,
         date,
         location,
         notes,
-        applyToAll,
+        applyToAll: true,
       });
     } finally {
-      setArchiving(false);
+      setPublishing(false);
     }
   }
 
@@ -142,7 +144,7 @@ function BatchCard({
       <CardContent className="flex flex-col gap-4">
         {/* Thumbnail grid */}
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
-          {batch.slides.slice(0, 8).map((slide) => (
+          {batch.slides.slice(0, expanded ? 50 : 8).map((slide) => (
             <div
               key={slide.id}
               className="aspect-square overflow-hidden rounded-md border bg-muted"
@@ -161,32 +163,50 @@ function BatchCard({
               )}
             </div>
           ))}
-          {batch.count > 8 && (
-            <div className="flex aspect-square items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground">
+          {!expanded && batch.count > 8 && (
+            <button
+              onClick={() => setExpanded(true)}
+              className="flex aspect-square items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground hover:bg-accent transition-colors"
+            >
               +{batch.count - 8}
-            </div>
+            </button>
           )}
         </div>
 
-        <p className="text-sm text-muted-foreground">
-          {batch.count === 1
-            ? "1 diapositiva"
-            : `${batch.count} diapositive`}
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {batch.count === 1
+              ? "1 diapositiva"
+              : `${batch.count} diapositive`}
+          </p>
+          {batch.count > 8 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? <ChevronUpIcon className="size-4" /> : <ChevronDownIcon className="size-4" />}
+              {expanded ? "Mostra meno" : "Mostra tutte"}
+            </Button>
+          )}
+        </div>
 
         <Separator />
 
-        {/* Metadata form */}
+        {/* Metadata form — applies to entire batch */}
+        <p className="text-xs font-medium text-muted-foreground">
+          Imposta titolo e dettagli per tutto il lotto:
+        </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`mag-${batch.id}`}>
-              {t("metadata.magazine")}
+            <Label htmlFor={`title-${batch.id}`}>
+              {t("metadata.title")}
             </Label>
             <Input
-              id={`mag-${batch.id}`}
-              placeholder={t("magazines.magazineNamePlaceholder")}
-              value={magazineName}
-              onChange={(e) => setMagazineName(e.target.value)}
+              id={`title-${batch.id}`}
+              placeholder="es. Vacanze estate 1985"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -223,25 +243,14 @@ function BatchCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id={`apply-all-${batch.id}`}
-            checked={applyToAll}
-            onCheckedChange={(v) => setApplyToAll(v === true)}
-          />
-          <Label htmlFor={`apply-all-${batch.id}`} className="font-normal">
-            Applica a tutte le diapositive del lotto
-          </Label>
-        </div>
-
         <div className="flex flex-wrap gap-2">
-          <Button onClick={handleArchive} disabled={archiving}>
-            {archiving ? (
+          <Button onClick={handlePublish} disabled={publishing}>
+            {publishing ? (
               <Loader2Icon className="animate-spin" />
             ) : (
-              <ArchiveIcon />
+              <SendIcon />
             )}
-            Archivia lotto
+            Pubblica nella galleria
           </Button>
           <Button variant="outline" render={<a href={`/coda/${batch.id}`} />}>
             <PencilIcon />
@@ -314,7 +323,7 @@ export default function CodaPage() {
     fetchBatches();
   }, [fetchBatches]);
 
-  const handleArchive = useCallback(
+  const handlePublish = useCallback(
     async (batchId: string, meta: BatchMeta) => {
       try {
         const res = await fetch("/api/v1/slides/batch/archive", {
@@ -324,10 +333,10 @@ export default function CodaPage() {
           credentials: "include",
         });
         if (!res.ok) throw new Error();
-        toast.success("Lotto archiviato con successo");
+        toast.success(t("success.slidesPublished"));
         setBatches((prev) => prev.filter((b) => b.id !== batchId));
       } catch {
-        toast.error("Errore durante l'archiviazione del lotto");
+        toast.error("Errore durante la pubblicazione del lotto");
       }
     },
     []
@@ -396,7 +405,7 @@ export default function CodaPage() {
               <BatchCard
                 key={batch.id}
                 batch={batch}
-                onArchive={handleArchive}
+                onPublish={handlePublish}
                 onDelete={handleDelete}
               />
             ))}

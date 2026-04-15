@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth } from '@/lib/auth/middleware';
 import { t } from '@/lib/i18n';
-import { eq, and, desc, asc, count } from 'drizzle-orm';
+import { eq, and, desc, asc, count, ilike, gte, lte, or } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {
   try {
@@ -16,12 +16,36 @@ export const GET = withAuth(async (request: NextRequest) => {
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const offset = (page - 1) * limit;
 
+    const location = searchParams.get('location');
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+    const q = searchParams.get('q');
+
     const conditions = [];
     if (status) {
       conditions.push(eq(schema.slides.status, status));
     }
     if (magazineId) {
       conditions.push(eq(schema.slides.magazineId, Number(magazineId)));
+    }
+    if (location) {
+      conditions.push(ilike(schema.slides.location, `%${location}%`));
+    }
+    if (dateFrom) {
+      conditions.push(gte(schema.slides.dateTakenPrecise, dateFrom));
+    }
+    if (dateTo) {
+      conditions.push(lte(schema.slides.dateTakenPrecise, dateTo));
+    }
+    if (q) {
+      conditions.push(
+        or(
+          ilike(schema.slides.title, `%${q}%`),
+          ilike(schema.slides.location, `%${q}%`),
+          ilike(schema.slides.notes, `%${q}%`),
+          ilike(schema.slides.originalFilename, `%${q}%`)
+        )
+      );
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

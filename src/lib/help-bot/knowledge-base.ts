@@ -55,10 +55,10 @@ export const knowledgeBase: HelpEntry[] = [
     id: "coda",
     question: "Cos'e la Coda in arrivo?",
     answer:
-      "La Coda in arrivo contiene le diapositive appena caricate che sono in attesa di essere elaborate. L'elaborazione include la generazione di miniature, l'estrazione dei dati EXIF e lo spostamento nell'archivio permanente.",
+      "La Coda in arrivo contiene le diapositive appena caricate. Puoi impostare titolo, data, luogo e note per tutto il lotto, oppure modificare i dettagli delle singole foto. Quando sei pronto, premi Pubblica per renderle visibili nella galleria. Se elimini dalla coda, le foto vengono cancellate definitivamente.",
     voiceAnswer:
-      "La coda contiene le diapositive appena caricate, in attesa di elaborazione e archiviazione.",
-    keywords: ["coda", "arrivo", "incoming", "attesa", "elaborazione", "processare", "lavorazione"],
+      "La coda contiene le diapositive caricate. Puoi impostare i dettagli per il lotto e poi pubblicarle nella galleria.",
+    keywords: ["coda", "arrivo", "incoming", "attesa", "pubblicare", "pubblica", "lotto", "batch"],
     category: "navigazione",
   },
 
@@ -99,10 +99,30 @@ export const knowledgeBase: HelpEntry[] = [
     id: "galleria",
     question: "Come funziona la Galleria?",
     answer:
-      "La Galleria mostra tutte le diapositive archiviate. Puoi sfogliarle in vista griglia o elenco, filtrarle per collezione, caricatore o stato, e ordinare per data o nome. Clicca su una diapositiva per vederne i dettagli e modificare i metadati.",
+      "La Galleria mostra tutte le diapositive pubblicate. Ha due viste: Tutte le foto e Album. Puoi filtrare per data, luogo e album, cercare per titolo o note, e ordinare per data o nome. Selezionando piu foto puoi archiviarle nel backup. Dalla vista dettaglio puoi modificare i metadati e archiviare singole foto.",
     voiceAnswer:
-      "La galleria mostra tutte le diapositive. Puoi filtrarle, ordinarle e cliccare su una per vedere i dettagli.",
-    keywords: ["galleria", "sfogliare", "visualizzare", "vedere", "griglia", "elenco", "tutte", "archivio", "foto"],
+      "La galleria ha due viste: tutte le foto e album. Puoi filtrare per data, luogo, cercare e archiviare nel backup.",
+    keywords: ["galleria", "sfogliare", "visualizzare", "album", "filtro", "filtrare", "data", "luogo", "foto", "tutte"],
+    category: "galleria",
+  },
+  {
+    id: "publish",
+    question: "Come pubblico le diapositive nella galleria?",
+    answer:
+      "Dalla Coda in arrivo, imposta titolo e dettagli per il lotto, poi premi il pulsante Pubblica nella galleria. Le diapositive diventeranno visibili nella galleria. Puoi anche modificare i dettagli delle singole foto prima di pubblicare.",
+    voiceAnswer:
+      "Dalla coda, imposta i dettagli e premi Pubblica. Le foto appariranno nella galleria.",
+    keywords: ["pubblicare", "pubblica", "galleria", "visibile", "attiva", "lotto", "batch"],
+    category: "caricamento",
+  },
+  {
+    id: "archive",
+    question: "Come archivio le diapositive?",
+    answer:
+      "Dalla galleria, seleziona una o piu diapositive e premi il pulsante Archivia. Le foto archiviate vengono spostate nel backup (S3 o NAS) e non sono piu visibili nella galleria. Puoi anche archiviare dalla vista dettaglio di una singola diapositiva.",
+    voiceAnswer:
+      "Seleziona le foto nella galleria e premi Archivia. Vengono spostate nel backup.",
+    keywords: ["archiviare", "archivio", "backup", "spostare", "rimuovere", "galleria"],
     category: "galleria",
   },
   {
