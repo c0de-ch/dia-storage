@@ -128,8 +128,10 @@ export function NavSidebar() {
           const data = await res.json();
           setQueueCount(data.count ?? 0);
         }
-      } catch {
-        // silently ignore
+      } catch (error) {
+        // Polled every 30s; avoid toast spam but surface in the console so
+        // devs can see a flapping backend.
+        console.error("Impossibile aggiornare la coda:", error);
       }
     }
     fetchQueueCount();

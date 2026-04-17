@@ -151,6 +151,8 @@ export default function GalleriaPage() {
       }
     } catch (error) {
       console.error("Errore nel caricamento:", error);
+      toast.error("Impossibile caricare le diapositive. Riprova piu tardi.");
+      setSlides([]);
     } finally {
       setLoading(false);
     }

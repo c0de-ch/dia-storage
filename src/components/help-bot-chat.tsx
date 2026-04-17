@@ -214,7 +214,7 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
 
         const data = await res.json();
         const fullAnswer =
-          data.answer ?? data.error ?? "Errore nella risposta.";
+          data.answer ?? data.message ?? data.error ?? "Errore nella risposta.";
 
         if (quickMatch) {
           // Replace quick answer with full AI answer, then speak the new one

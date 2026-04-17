@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { settings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { withAuth } from "@/lib/auth/middleware";
+import { apiError } from "@/lib/api/errors";
 
 // Approximate cost per 1M tokens (USD) — conservative estimates
 const COST_PER_1M_INPUT: Record<string, number> = {
@@ -122,18 +123,16 @@ export const POST = withAuth(async (request: NextRequest) => {
     // Check if AI is enabled
     const aiEnabled = await getSetting("aiEnabled");
     if (aiEnabled === "false") {
-      return NextResponse.json(
-        { error: "L'assistente IA e disattivato. Un amministratore puo abilitarlo nelle Impostazioni." },
-        { status: 403 }
+      return apiError(
+        403,
+        "L'assistente IA e disattivato. Un amministratore puo abilitarlo nelle Impostazioni.",
+        "AI_DISABLED",
       );
     }
 
     const { message, history, lang } = await request.json();
     if (!message || typeof message !== "string") {
-      return NextResponse.json(
-        { error: "Messaggio mancante." },
-        { status: 400 }
-      );
+      return apiError(400, "Messaggio mancante.");
     }
 
     // Check provider FIRST — Ollama doesn't need an API key or spending cap
@@ -176,9 +175,10 @@ export const POST = withAuth(async (request: NextRequest) => {
       if (!ollamaRes.ok) {
         const errText = await ollamaRes.text().catch(() => "");
         console.error("Errore Ollama:", errText);
-        return NextResponse.json(
-          { error: `Errore nella connessione a Ollama (${ollamaModel}). Verifica che il server sia in esecuzione.` },
-          { status: 502 }
+        return apiError(
+          502,
+          `Errore nella connessione a Ollama (${ollamaModel}). Verifica che il server sia in esecuzione.`,
+          "OLLAMA_UNREACHABLE",
         );
       }
 
@@ -201,9 +201,10 @@ export const POST = withAuth(async (request: NextRequest) => {
       : process.env.ANTHROPIC_API_KEY;
 
     if (!apiKey) {
-      return NextResponse.json(
-        { error: "Chiave API Anthropic non configurata. Vai in Impostazioni > Assistente IA." },
-        { status: 500 }
+      return apiError(
+        500,
+        "Chiave API Anthropic non configurata. Vai in Impostazioni > Assistente IA.",
+        "ANTHROPIC_KEY_MISSING",
       );
     }
 
@@ -215,11 +216,10 @@ export const POST = withAuth(async (request: NextRequest) => {
     const currentUsage = currentUsageStr ? parseFloat(currentUsageStr) : 0;
 
     if (currentUsage >= maxMonthly) {
-      return NextResponse.json(
-        {
-          error: `Limite di spesa mensile raggiunto ($${currentUsage.toFixed(2)} / $${maxMonthly.toFixed(2)}). Il limite viene reimpostato il primo del mese.`,
-        },
-        { status: 429 }
+      return apiError(
+        429,
+        `Limite di spesa mensile raggiunto ($${currentUsage.toFixed(2)} / $${maxMonthly.toFixed(2)}). Il limite viene reimpostato il primo del mese.`,
+        "SPEND_LIMIT_REACHED",
       );
     }
 
@@ -279,9 +279,6 @@ export const POST = withAuth(async (request: NextRequest) => {
     });
   } catch (error) {
     console.error("Errore help-bot:", error);
-    return NextResponse.json(
-      { error: "Errore nella generazione della risposta." },
-      { status: 500 }
-    );
+    return apiError(500, "Errore nella generazione della risposta.");
   }
 });

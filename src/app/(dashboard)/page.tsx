@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,8 +58,9 @@ export default function DashboardPage() {
           const data = await slidesRes.json();
           setRecentSlides(data.items ?? data.slides ?? []);
         }
-      } catch {
-        // silently fail
+      } catch (error) {
+        console.error("Errore nel caricamento della dashboard:", error);
+        toast.error("Impossibile caricare la dashboard. Riprova piu tardi.");
       } finally {
         setLoading(false);
       }
