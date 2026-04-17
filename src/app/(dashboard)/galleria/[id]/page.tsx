@@ -41,6 +41,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ImageViewer } from "@/components/image-viewer";
 import { MetadataForm } from "@/components/metadata-form";
 import { ExifPanel } from "@/components/exif-panel";
+import { t } from "@/lib/i18n";
 import type { Slide } from "@/types/slide";
 
 export default function SlideDetailPage() {
@@ -231,10 +232,10 @@ export default function SlideDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center gap-3 p-8">
         <p className="text-lg font-medium text-muted-foreground">
-          Diapositiva non trovata
+          {t("errors.slideNotFound")}
         </p>
         <Button variant="outline" onClick={() => router.push("/galleria")}>
-          Torna alla galleria
+          {t("gallery.backToGallery")}
         </Button>
       </div>
     );
@@ -401,25 +402,24 @@ export default function SlideDetailPage() {
                     ) : (
                       <Trash2Icon className="mr-1.5 size-3.5" />
                     )}
-                    Elimina diapositiva
+                    {t("gallery.deleteSlide")}
                   </Button>
                 }
               />
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+                  <AlertDialogTitle>{t("confirm.deleteTitle")}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Sei sicuro di voler eliminare questa diapositiva? Questa
-                    azione non puo essere annullata.
+                    {t("gallery.deleteSlideConfirmLong")}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                  <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDelete}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    Elimina
+                    {t("actions.delete")}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

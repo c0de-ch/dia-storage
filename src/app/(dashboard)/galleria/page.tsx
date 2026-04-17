@@ -452,10 +452,10 @@ export default function GalleriaPage() {
                       onValueChange={(v) => { setFilterCollectionId(v === "all" ? "" : (v ?? "")); setPage(1); }}
                     >
                       <SelectTrigger className="w-44">
-                        <SelectValue placeholder="Tutti gli album" />
+                        <SelectValue placeholder={t("gallery.allAlbums")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Tutti gli album</SelectItem>
+                        <SelectItem value="all">{t("gallery.allAlbums")}</SelectItem>
                         {collections.map((c) => (
                           <SelectItem key={c.id} value={String(c.id)}>
                             {c.name}

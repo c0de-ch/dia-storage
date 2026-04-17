@@ -37,6 +37,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { t } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -283,7 +284,7 @@ export default function RegistroPage() {
         <CardContent className="pt-4">
           {loading ? (
             <p className="text-muted-foreground py-8 text-center">
-              Caricamento...
+              {t("labels.loading")}
             </p>
           ) : entries.length === 0 ? (
             <div className="py-8 text-center">
@@ -297,8 +298,8 @@ export default function RegistroPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Utente</TableHead>
+                    <TableHead>{t("labels.date")}</TableHead>
+                    <TableHead>{t("roles.user")}</TableHead>
                     <TableHead>Azione</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Dettagli</TableHead>

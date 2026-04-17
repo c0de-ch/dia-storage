@@ -126,7 +126,7 @@ export default function DashboardPage() {
         </Button>
         <Button variant="outline" nativeButton={false} render={<Link href="/galleria" />}>
           <ImageIcon />
-          Sfoglia galleria
+          {t("gallery.browseGallery")}
         </Button>
       </div>
 

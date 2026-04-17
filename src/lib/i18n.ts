@@ -258,6 +258,11 @@ const translations = {
     slidesSelectedSingular: "1 diapositiva selezionata",
     slidesSelectedPlural: "{count} diapositive selezionate",
     noDetails: "Nessun dettaglio",
+    backToGallery: "Torna alla galleria",
+    deleteSlideConfirmLong:
+      "Sei sicuro di voler eliminare questa diapositiva? Questa azione non può essere annullata.",
+    browseGallery: "Sfoglia galleria",
+    allAlbums: "Tutti gli album",
   },
 
   // ---------------------------------------------------------------------------
@@ -291,6 +296,8 @@ const translations = {
     noLocation: "Luogo non specificato",
     noDate: "Data non specificata",
     noNotes: "Nessuna nota",
+    slideTitlePlaceholder: "Titolo della diapositiva",
+    saveChanges: "Salva modifiche",
   },
 
   // ---------------------------------------------------------------------------
@@ -318,8 +325,12 @@ const translations = {
     placeholder: "Cerca per titolo, luogo, note...",
     advancedSearch: "Ricerca avanzata",
     searchResults: "Risultati della ricerca",
+    subtitleLong: "Cerca tra tutte le diapositive archiviate",
+    searching: "Ricerca...",
+    allMagazines: "Tutti i caricatori",
     noResults: "Nessun risultato trovato",
     noResultsHint: "Prova con termini di ricerca diversi",
+    tryAdjusting: "Prova a modificare i criteri di ricerca",
     resultsCount: "{count} risultati trovati",
     resultsSingular: "1 risultato trovato",
     searchIn: "Cerca in",
@@ -397,6 +408,12 @@ const translations = {
     generateThumbnails: "Genera miniature",
     extractExif: "Estrai dati EXIF",
     moveToArchive: "Sposta in archivio",
+    incomingTitle: "Coda in arrivo",
+    publishToGallery: "Pubblica nella galleria",
+    editIndividual: "Modifica singole",
+    goToQueue: "Vai alla coda",
+    queuedForProcessing: "Le diapositive sono state aggiunte alla coda di elaborazione.",
+    metadataDescription: "Informazioni aggiuntive da associare alle diapositive caricate",
   },
 
   // ---------------------------------------------------------------------------

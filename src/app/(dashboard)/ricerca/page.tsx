@@ -34,6 +34,7 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { SearchBar } from "@/components/search-bar";
+import { t } from "@/lib/i18n";
 import { SlideCard, SlideCardSkeleton } from "@/components/slide-card";
 import type { Slide, PaginationInfo } from "@/types/slide";
 
@@ -167,9 +168,9 @@ export default function RicercaPage() {
     <div className="flex flex-col gap-6 p-4 sm:p-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Ricerca</h1>
+        <h1 className="text-2xl font-bold">{t("search.title")}</h1>
         <p className="text-sm text-muted-foreground">
-          Cerca tra tutte le diapositive archiviate
+          {t("search.subtitleLong")}
         </p>
       </div>
 
@@ -186,12 +187,12 @@ export default function RicercaPage() {
           {loading ? (
             <span className="flex items-center gap-1.5">
               <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              Ricerca...
+              {t("search.searching")}
             </span>
           ) : (
             <>
               <SearchIcon className="mr-1.5 size-4" />
-              Cerca
+              {t("actions.search")}
             </>
           )}
         </Button>
@@ -226,7 +227,7 @@ export default function RicercaPage() {
               ) : (
                 <ChevronDownIcon className="size-3.5" />
               )}
-              Ricerca avanzata
+              {t("search.advancedSearch")}
             </Button>
           }
         />
@@ -275,10 +276,10 @@ export default function RicercaPage() {
                 onValueChange={(v) => setMagazineFilter(v ?? "")}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Tutti i caricatori" />
+                  <SelectValue placeholder={t("search.allMagazines")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tutti i caricatori</SelectItem>
+                  <SelectItem value="">{t("search.allMagazines")}</SelectItem>
                   {magazines.map((m) => (
                     <SelectItem key={m.id} value={String(m.id)}>
                       {m.name}
@@ -318,10 +319,10 @@ export default function RicercaPage() {
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
               <ImageOffIcon className="size-12 text-muted-foreground/40" />
               <h2 className="text-lg font-medium text-muted-foreground">
-                Nessun risultato
+                {t("labels.noResults")}
               </h2>
               <p className="text-sm text-muted-foreground/70">
-                Prova a modificare i criteri di ricerca
+                {t("search.tryAdjusting")}
               </p>
             </div>
           ) : (

@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { DatePickerIt } from "@/components/date-picker-it";
 import { LocationPicker } from "@/components/location-picker";
+import { t } from "@/lib/i18n";
 
 interface MetadataFormValues {
   title: string;
@@ -121,12 +122,12 @@ export function MetadataForm({
     <div className={`space-y-4 ${className ?? ""}`}>
       {/* Title */}
       <div className="space-y-1.5">
-        <Label htmlFor="meta-title">Titolo</Label>
+        <Label htmlFor="meta-title">{t("labels.title")}</Label>
         <Input
           id="meta-title"
           value={values.title}
           onChange={(e) => handleChange("title", e.target.value)}
-          placeholder="Titolo della diapositiva"
+          placeholder={t("metadata.slideTitlePlaceholder")}
         />
       </div>
 
@@ -169,12 +170,12 @@ export function MetadataForm({
           {saveStatus === "saving" ? (
             <>
               <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
-              Salvataggio...
+              {t("labels.saving")}
             </>
           ) : (
             <>
               <SaveIcon className="mr-1.5 size-3.5" />
-              Salva modifiche
+              {t("metadata.saveChanges")}
             </>
           )}
         </Button>

@@ -53,6 +53,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { t } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -235,7 +236,7 @@ export default function BackupPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <p className="text-muted-foreground">Caricamento...</p>
+        <p className="text-muted-foreground">{t("labels.loading")}</p>
       </div>
     );
   }
@@ -365,7 +366,7 @@ export default function BackupPage() {
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Annulla</AlertDialogCancel>
+                    <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
                     <AlertDialogAction onClick={triggerBackup}>
                       Avvia backup
                     </AlertDialogAction>

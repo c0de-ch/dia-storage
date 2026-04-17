@@ -14,6 +14,7 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
+import { t } from "@/lib/i18n";
 
 interface SearchBarProps {
   value?: string;
@@ -142,7 +143,7 @@ export function SearchBarWithCommand() {
                 }}
               >
                 <SearchIcon className="mr-2 size-4" />
-                Ricerca avanzata
+                {t("search.advancedSearch")}
               </CommandItem>
             </CommandGroup>
           </CommandList>

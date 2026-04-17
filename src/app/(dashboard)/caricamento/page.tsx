@@ -198,13 +198,13 @@ export default function CaricamentoPage() {
                 {t("upload.uploadComplete")}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Le diapositive sono state aggiunte alla coda di elaborazione.
+                {t("queue.queuedForProcessing")}
               </p>
             </div>
             <div className="flex gap-3">
               <Button nativeButton={false} render={<Link href="/coda" />}>
                 <InboxIcon />
-                Vai alla coda
+                {t("queue.goToQueue")}
               </Button>
               <Button variant="outline" onClick={handleReset}>
                 <UploadIcon />
@@ -245,7 +245,7 @@ export default function CaricamentoPage() {
               <CardHeader>
                 <CardTitle>Metadati {t("labels.optional").toLowerCase()}</CardTitle>
                 <CardDescription>
-                  Informazioni aggiuntive da associare alle diapositive caricate
+                  {t("queue.metadataDescription")}
                 </CardDescription>
               </CardHeader>
               <CardContent>

@@ -60,6 +60,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { t } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -100,7 +101,7 @@ function roleBadge(role: string) {
         </Badge>
       );
     default:
-      return <Badge variant="secondary">Utente</Badge>;
+      return <Badge variant="secondary">{t("roles.user")}</Badge>;
   }
 }
 
@@ -462,7 +463,7 @@ function UserApiKeys({
 
           {/* Keys list */}
           {loading ? (
-            <p className="text-muted-foreground text-sm">Caricamento...</p>
+            <p className="text-muted-foreground text-sm">{t("labels.loading")}</p>
           ) : keys.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               Nessuna chiave API presente.
@@ -526,7 +527,7 @@ function UserApiKeys({
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
                               <AlertDialogAction
                                 variant="destructive"
                                 onClick={() => revokeKey(k.id)}
@@ -610,15 +611,15 @@ export default function UtentiPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Gestione utenti
+            {t("users.title")}
           </h1>
           <p className="text-muted-foreground">
-            Crea, modifica e gestisci gli utenti del sistema.
+            {t("users.subtitle")}
           </p>
         </div>
         <Button onClick={openAdd}>
           <UserPlus className="size-4 mr-1.5" />
-          Nuovo utente
+          {t("users.createUser")}
         </Button>
       </div>
 
@@ -633,22 +634,22 @@ export default function UtentiPage() {
         <CardContent className="pt-4">
           {loading ? (
             <p className="text-muted-foreground py-8 text-center">
-              Caricamento...
+              {t("labels.loading")}
             </p>
           ) : users.length === 0 ? (
             <p className="text-muted-foreground py-8 text-center">
-              Nessun utente presente.
+              {t("users.noUsers")}
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Telefono</TableHead>
-                  <TableHead>Ruolo</TableHead>
-                  <TableHead>Canale OTP</TableHead>
-                  <TableHead>Stato</TableHead>
+                  <TableHead>{t("labels.name")}</TableHead>
+                  <TableHead>{t("labels.email")}</TableHead>
+                  <TableHead>{t("labels.phone")}</TableHead>
+                  <TableHead>{t("labels.role")}</TableHead>
+                  <TableHead>{t("users.otpChannel")}</TableHead>
+                  <TableHead>{t("labels.status")}</TableHead>
                   <TableHead>Azioni</TableHead>
                 </TableRow>
               </TableHeader>
@@ -716,7 +717,7 @@ export default function UtentiPage() {
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
                                 <AlertDialogAction
                                   variant="destructive"
                                   onClick={() => deactivateUser(u.id)}

@@ -254,11 +254,11 @@ function BatchCard({
             ) : (
               <SendIcon />
             )}
-            Pubblica nella galleria
+            {t("queue.publishToGallery")}
           </Button>
           <Button variant="outline" render={<a href={`/coda/${batch.id}`} />}>
             <PencilIcon />
-            Modifica singole
+            {t("queue.editIndividual")}
           </Button>
           <Button
             variant="destructive"
@@ -383,7 +383,7 @@ export default function CodaPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Coda in arrivo</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("queue.incomingTitle")}</h1>
         <p className="text-muted-foreground">
           {t("queue.subtitle")}
         </p>
