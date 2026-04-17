@@ -1,4 +1,16 @@
 import { vi } from "vitest";
+
+vi.mock("@/lib/db", () => {
+  const db: Record<string, unknown> = {
+    select: vi.fn(),
+    insert: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    execute: vi.fn(),
+  };
+  db.transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(db));
+  return { db };
+});
 import { db } from "@/lib/db";
 
 // Mock config loader
@@ -88,6 +100,11 @@ describe("createOtpCode", () => {
     vi.mocked(getConfig).mockReturnValue({
       auth: { otpLength: 6, otpExpiryMinutes: 10 },
     } as ReturnType<typeof getConfig>);
+    // createOtpCode invalidates prior unused codes inside a transaction before
+    // inserting, so db.update must be chainable for the happy path.
+    const invalidateWhere = vi.fn().mockResolvedValue({});
+    const invalidateSet = vi.fn().mockReturnValue({ where: invalidateWhere });
+    vi.mocked(db.update).mockReturnValue({ set: invalidateSet } as never);
   });
 
   it("inserts a code into the database and returns it", async () => {

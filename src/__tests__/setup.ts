@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 
-// Mock next/headers cookies
+// Mock next/headers cookies/headers. This is runtime-provided in Next.js and
+// cannot be imported outside a request context, so it has to be stubbed here.
 vi.mock("next/headers", () => ({
   cookies: vi.fn(() => ({
     get: vi.fn(),
@@ -10,41 +11,9 @@ vi.mock("next/headers", () => ({
   headers: vi.fn(() => new Map()),
 }));
 
-// Mock database by default — tests can override.
-// Transactions invoke the callback with the same `db` reference so per-test
-// mocks like `vi.mocked(db.insert).mockReturnValue(...)` apply inside tx too.
-vi.mock("@/lib/db", () => {
-  const db: Record<string, unknown> = {
-    select: vi.fn(() => ({
-      from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: vi.fn(() => []),
-        })),
-        innerJoin: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn(() => []),
-          })),
-        })),
-        orderBy: vi.fn(() => ({
-          limit: vi.fn(() => []),
-        })),
-      })),
-    })),
-    insert: vi.fn(() => ({
-      values: vi.fn(() => ({
-        returning: vi.fn(() => []),
-      })),
-    })),
-    update: vi.fn(() => ({
-      set: vi.fn(() => ({
-        where: vi.fn(() => ({})),
-      })),
-    })),
-    delete: vi.fn(() => ({
-      where: vi.fn(() => ({})),
-    })),
-    execute: vi.fn(),
-  };
-  db.transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(db));
-  return { db };
-});
+// NOTE: no global mock for `@/lib/db`. Each test file that touches the
+// database must declare its own `vi.mock("@/lib/db", ...)` shaped to the
+// specific queries it exercises. A blanket mock here would let broken
+// queries pass tests (we were burned by this: the API-key middleware bug
+// in #1 would have been caught by a realistic mock that matched rows only
+// on the hashed key).

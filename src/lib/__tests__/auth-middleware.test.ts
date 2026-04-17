@@ -1,4 +1,16 @@
 import { vi } from "vitest";
+
+vi.mock("@/lib/db", () => {
+  const db: Record<string, unknown> = {
+    select: vi.fn(),
+    insert: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    execute: vi.fn(),
+  };
+  db.transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(db));
+  return { db };
+});
 import { db } from "@/lib/db";
 import { NextRequest } from "next/server";
 

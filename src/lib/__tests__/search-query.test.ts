@@ -1,6 +1,18 @@
 import { buildSearchQuery, type SearchParams } from "@/lib/search/query";
 import { db } from "@/lib/db";
 
+vi.mock("@/lib/db", () => {
+  const db: Record<string, unknown> = {
+    select: vi.fn(),
+    insert: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    execute: vi.fn(),
+  };
+  db.transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(db));
+  return { db };
+});
+
 // The global db mock from setup.ts provides a chainable mock.
 // We need a more specific mock that captures how buildSearchQuery chains calls.
 
