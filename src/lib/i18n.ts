@@ -255,6 +255,9 @@ const translations = {
       "Sei sicuro di voler eliminare {count} diapositive selezionate?",
     batchEdit: "Modifica in blocco",
     batchEditSelected: "Modifica {count} diapositive selezionate",
+    slidesSelectedSingular: "1 diapositiva selezionata",
+    slidesSelectedPlural: "{count} diapositive selezionate",
+    noDetails: "Nessun dettaglio",
   },
 
   // ---------------------------------------------------------------------------
@@ -678,6 +681,10 @@ const translations = {
     bulkDeleteTitle: "Eliminazione multipla",
     bulkDeleteMessage:
       "Stai per eliminare {count} elementi. Questa azione non può essere annullata.",
+    deleteSlidesSingular:
+      "Sei sicuro di voler eliminare 1 diapositiva? Questa azione non può essere annullata.",
+    deleteSlidesPlural:
+      "Sei sicuro di voler eliminare {count} diapositive? Questa azione non può essere annullata.",
     processTitle: "Conferma elaborazione",
     processMessage: "Vuoi avviare l'elaborazione degli elementi selezionati?",
     backupTitle: "Conferma backup",

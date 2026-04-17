@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ImageIcon } from "lucide-react";
 import type { Slide } from "@/types/slide";
+import { t } from "@/lib/i18n";
 
 interface SlideCardProps {
   slide: Slide;
@@ -77,9 +78,9 @@ export const SlideCard = memo(function SlideCard({
         <div className="absolute top-2 right-2 z-10">
           <Badge variant={statusBadgeVariant}>
             {slide.status === "incoming"
-              ? "In arrivo"
+              ? t("status.incoming")
               : slide.status === "deleted"
-                ? "Eliminata"
+                ? t("status.deleted")
                 : slide.status}
           </Badge>
         </div>
@@ -103,7 +104,7 @@ export const SlideCard = memo(function SlideCard({
         )}
         {!displayDate && !displayLocation && (
           <p className="text-xs text-muted-foreground/50 italic">
-            Nessun dettaglio
+            {t("gallery.noDetails")}
           </p>
         )}
       </div>
