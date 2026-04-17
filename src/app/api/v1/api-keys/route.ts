@@ -3,10 +3,8 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, withAdmin, AuthenticatedRequest } from '@/lib/auth/middleware';
 import { generateApiKey, hashApiKey } from '@/lib/auth/api-key';
-import { t } from '@/lib/i18n';
-import { eq } from 'drizzle-orm';
 
-export const GET = withAdmin(async (request: NextRequest) => {
+export const GET = withAdmin(async (_request: NextRequest) => {
   try {
     const apiKeysList = await db
       .select({

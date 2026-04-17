@@ -26,7 +26,6 @@ import {
   CheckCircle2Icon,
   DownloadIcon,
   InboxIcon,
-  Loader2Icon,
   MonitorSmartphoneIcon,
   UploadIcon,
 } from "lucide-react";

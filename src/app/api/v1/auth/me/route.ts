@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
-import { t } from '@/lib/i18n';
 
 export const GET = withAuth(async (request: NextRequest) => {
   try {

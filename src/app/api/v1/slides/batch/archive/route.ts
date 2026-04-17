@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth } from '@/lib/auth/middleware';
-import { t } from '@/lib/i18n';
 import { eq, and, inArray } from 'drizzle-orm';
 
 export const POST = withAuth(async (request: NextRequest) => {

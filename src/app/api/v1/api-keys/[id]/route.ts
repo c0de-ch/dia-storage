@@ -4,7 +4,6 @@ import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canManageApiKeys } from '@/lib/auth/permissions';
 import { parseIdParam } from '@/lib/api/params';
-import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
 
 export const DELETE = withAuth(async (request: NextRequest, context) => {

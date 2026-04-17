@@ -5,7 +5,6 @@ import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canEditSlide, canDeleteSlide } from '@/lib/auth/permissions';
 import { parseIdParam } from '@/lib/api/params';
 import { parseJsonBody, slidePatchSchema } from '@/lib/api/validation';
-import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest, context) => {

@@ -273,7 +273,7 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
         setIsLoading(false);
       }
     },
-    [messages, isLoading, speakIfVoice, cancel]
+    [messages, isLoading, speakIfVoice, cancel, lang]
   );
 
   function handleFormSubmit(e: React.FormEvent) {

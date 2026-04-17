@@ -484,6 +484,7 @@ export default function AiutoPage() {
               Panoramica dello scanner
             </h3>
             <div className="overflow-hidden rounded-lg border">
+              {/* eslint-disable-next-line @next/next/no-img-element -- static help illustration, low-traffic page */}
               <img
                 src="/images/manual/scanner-overview.jpg"
                 alt="Reflecta DigitDia Evolution - panoramica"
@@ -504,6 +505,7 @@ export default function AiutoPage() {
               Componenti del dispositivo
             </h3>
             <div className="overflow-hidden rounded-lg border">
+              {/* eslint-disable-next-line @next/next/no-img-element -- static help illustration, low-traffic page */}
               <img
                 src="/images/manual/product-parts.jpg"
                 alt="Reflecta DigitDia Evolution - componenti numerati"
@@ -535,6 +537,7 @@ export default function AiutoPage() {
               Utilizzo dei caricatori (magazine)
             </h3>
             <div className="overflow-hidden rounded-lg border">
+              {/* eslint-disable-next-line @next/next/no-img-element -- static help illustration, low-traffic page */}
               <img
                 src="/images/manual/magazine-usage.jpg"
                 alt="Reflecta DigitDia Evolution - utilizzo caricatori"

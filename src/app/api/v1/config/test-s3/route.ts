@@ -4,7 +4,7 @@ import * as schema from '@/lib/db/schema';
 import { withAdmin } from '@/lib/auth/middleware';
 import { S3Client, type S3ClientConfig, ListBucketsCommand } from '@aws-sdk/client-s3';
 
-export const POST = withAdmin(async (request: NextRequest) => {
+export const POST = withAdmin(async (_request: NextRequest) => {
   try {
     const configs = await db.select().from(schema.settings);
     const configMap: Record<string, string> = {};

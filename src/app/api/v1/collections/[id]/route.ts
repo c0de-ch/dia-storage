@@ -5,7 +5,6 @@ import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canEditCollection, canDeleteCollection } from '@/lib/auth/permissions';
 import { parseIdParam } from '@/lib/api/params';
 import { parseJsonBody, collectionPatchSchema } from '@/lib/api/validation';
-import { t } from '@/lib/i18n';
 import { eq, and, ne, inArray } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest, context) => {

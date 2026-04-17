@@ -4,4 +4,19 @@
 	request_body {
 		max_size 200MB
 	}
+
+	header {
+		# Stop clickjacking -- the app is never meant to be framed.
+		X-Frame-Options "DENY"
+		# Force declared Content-Type, block MIME sniffing.
+		X-Content-Type-Options "nosniff"
+		# Minimise referrer leakage to third parties.
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# HSTS: Caddy already serves HTTPS, lock browsers into it.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Deny powerful browser APIs we don't use.
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		# Caddy emits this by default; hide it.
+		-Server
+	}
 }

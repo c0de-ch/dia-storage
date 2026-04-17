@@ -1,4 +1,4 @@
-import { knowledgeBase, suggestedTopics, type HelpEntry } from "@/lib/help-bot/knowledge-base";
+import { knowledgeBase, suggestedTopics } from "@/lib/help-bot/knowledge-base";
 
 describe("knowledgeBase", () => {
   it("exports a non-empty array of help entries", () => {

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAdmin } from '@/lib/auth/middleware';
-import { t } from '@/lib/i18n';
 import { eq, count, desc } from 'drizzle-orm';
 
 export const GET = withAdmin(async (request: NextRequest) => {

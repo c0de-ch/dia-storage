@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -56,7 +56,6 @@ const QUICK_SUGGESTIONS = [
 ];
 
 export default function RicercaPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [query, setQuery] = useState(searchParams.get("q") ?? "");

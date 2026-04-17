@@ -129,7 +129,7 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions): Use
         silenceTimerRef.current = null;
       }
     };
-  }, [isListening, lastSpeechTime]);
+  }, [isListening, lastSpeechTime, silenceTimeout]);
 
   const startListening = useCallback(() => {
     if (!recognitionRef.current || isListening) return;

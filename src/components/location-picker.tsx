@@ -252,6 +252,7 @@ export function LocationPicker({
             ))}
           </ul>
           <div className="border-t px-3 py-1.5">
+            {/* eslint-disable-next-line @next/next/no-img-element -- tiny remote attribution logo, not worth next/image loader */}
             <img
               src="https://maps.gstatic.com/mapfiles/api-3/images/powered-by-google-on-white3_hdpi.png"
               alt="Powered by Google"

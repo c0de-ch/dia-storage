@@ -1,12 +1,12 @@
 import { writeFile } from 'node:fs/promises';
-import { rename, copyFile } from 'node:fs/promises';
+import { copyFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { eq, and } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { isValidJpeg } from './validation';
-import { computeChecksumFromBuffer, computeChecksum } from './checksum';
+import { computeChecksumFromBuffer } from './checksum';
 import { extractExif } from './exif-reader';
 import { writeExifDate } from './exif-writer';
 import { generateThumbnail, generateMedium, getImageDimensions } from './thumbnails';

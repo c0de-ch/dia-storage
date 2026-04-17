@@ -5,7 +5,6 @@ import * as schema from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { getConfig } from '@/lib/config/loader';
-import { t } from '@/lib/i18n';
 import { nanoid } from 'nanoid';
 import sharp from 'sharp';
 import { writeFile, mkdir } from 'fs/promises';

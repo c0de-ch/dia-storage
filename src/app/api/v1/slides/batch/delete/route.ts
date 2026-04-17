@@ -6,8 +6,6 @@ import { eq, and, inArray } from 'drizzle-orm';
 import { rm } from 'fs/promises';
 import path from 'path';
 
-const UPLOAD_DIR = process.env.STORAGE_PATH || './storage';
-
 export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json();

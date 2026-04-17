@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth } from '@/lib/auth/middleware';
-import { t } from '@/lib/i18n';
 import { and, or, ilike, gte, lte, eq, desc, count, sql } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {

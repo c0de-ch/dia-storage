@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArchiveIcon,
   ChevronLeftIcon,
@@ -95,9 +96,12 @@ export default function SlideDetailPage() {
       ? siblings[currentSibIndex + 1]
       : null;
 
-  function navigateTo(id: number) {
-    router.push(`/galleria/${id}`);
-  }
+  const navigateTo = useCallback(
+    (id: number) => {
+      router.push(`/galleria/${id}`);
+    },
+    [router],
+  );
 
   // Keyboard navigation
   useEffect(() => {
@@ -115,7 +119,7 @@ export default function SlideDetailPage() {
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [prevSlide, nextSlide]);
+  }, [prevSlide, nextSlide, navigateTo]);
 
   // Delete
   async function handleDelete() {
@@ -464,12 +468,15 @@ function SiblingThumb({ id, alt }: { id: number; alt: string }) {
     );
   }
   return (
-    <img
-      src={`/api/v1/slides/${id}/thumbnail`}
-      alt={alt}
-      className="h-16 w-24 object-cover"
-      loading="lazy"
-      onError={() => setFailed(true)}
-    />
+    <div className="relative h-16 w-24 overflow-hidden">
+      <Image
+        src={`/api/v1/slides/${id}/thumbnail`}
+        alt={alt}
+        fill
+        sizes="96px"
+        className="object-cover"
+        onError={() => setFailed(true)}
+      />
+    </div>
   );
 }

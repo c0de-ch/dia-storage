@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { toast } from "sonner";
 import { t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -10,13 +11,11 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ImageIcon,
   InboxIcon,
-  UsersIcon,
   UploadIcon,
   GalleryHorizontalEndIcon,
 } from "lucide-react";
@@ -163,10 +162,12 @@ export default function DashboardPage() {
                 className="group relative aspect-square overflow-hidden rounded-lg border bg-muted transition-colors hover:border-primary"
               >
                 {slide.thumbnailUrl ? (
-                  <img
+                  <Image
                     src={slide.thumbnailUrl}
                     alt={slide.title ?? "Diapositiva"}
-                    className="size-full object-cover transition-transform group-hover:scale-105"
+                    fill
+                    sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+                    className="object-cover transition-transform group-hover:scale-105"
                   />
                 ) : (
                   <div className="flex size-full items-center justify-center">

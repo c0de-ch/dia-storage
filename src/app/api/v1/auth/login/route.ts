@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
 import { sendOtpEmail } from '@/lib/email/transport';
 import { createOtpCode } from '@/lib/auth/otp';

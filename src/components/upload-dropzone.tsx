@@ -190,6 +190,7 @@ function FileThumb({
           <span className="text-[9px] font-medium uppercase text-muted-foreground">{ext}</span>
         </div>
       ) : src ? (
+        /* eslint-disable-next-line @next/next/no-img-element -- blob URL preview of a to-be-uploaded file */
         <img
           src={src}
           alt={file.name}

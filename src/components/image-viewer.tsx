@@ -166,6 +166,7 @@ export function ImageViewer({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
+        {/* eslint-disable-next-line @next/next/no-img-element -- zoom/pan viewer needs the raw image element */}
         <img
           src={src}
           alt={alt}

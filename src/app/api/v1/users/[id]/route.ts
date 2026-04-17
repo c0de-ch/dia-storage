@@ -4,7 +4,6 @@ import * as schema from '@/lib/db/schema';
 import { withAdmin } from '@/lib/auth/middleware';
 import { parseIdParam } from '@/lib/api/params';
 import { parseJsonBody, userPatchSchema } from '@/lib/api/validation';
-import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
 
 export const PATCH = withAdmin(async (request: NextRequest, context) => {
