@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -122,10 +123,12 @@ function ThumbnailImage({ slideId, alt }: { slideId: number; alt: string }) {
           <ImageIcon className="size-8 text-muted-foreground" />
         </div>
       ) : (
-        <img
+        <Image
           src={`/api/v1/slides/${slideId}/thumbnail`}
           alt={alt}
-          className="h-full w-full object-cover transition-transform group-hover/slide:scale-105"
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
+          className="object-cover transition-transform group-hover/slide:scale-105"
           loading="lazy"
           onError={() => setFailed(true)}
         />

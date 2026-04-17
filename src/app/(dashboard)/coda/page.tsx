@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { t } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -148,13 +149,16 @@ function BatchCard({
           {batch.slides.slice(0, expanded ? 50 : 8).map((slide) => (
             <div
               key={slide.id}
-              className="aspect-square overflow-hidden rounded-md border bg-muted"
+              className="relative aspect-square overflow-hidden rounded-md border bg-muted"
             >
               {slide.thumbnailUrl ? (
-                <img
+                <Image
                   src={slide.thumbnailUrl}
                   alt={slide.originalFilename ?? "Diapositiva"}
-                  className="size-full object-cover"
+                  fill
+                  sizes="(max-width: 640px) 25vw, (max-width: 1024px) 12vw, 8vw"
+                  className="object-cover"
+                  loading="lazy"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                 />
               ) : (

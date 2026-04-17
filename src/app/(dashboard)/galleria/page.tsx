@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArchiveIcon,
   CalendarIcon,
@@ -80,6 +81,13 @@ export default function GalleriaPage() {
   const [searchQuery, setSearchQuery] = useState(
     searchParams.get("q") ?? ""
   );
+  // Debounced copy of searchQuery used by fetchSlides so we don't fire a
+  // request on every keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 250);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
   const [sortBy, setSortBy] = useState(
     searchParams.get("sortBy") ?? "createdAt"
   );
@@ -131,7 +139,7 @@ export default function GalleriaPage() {
         sortBy,
         sortOrder,
       });
-      if (searchQuery.trim()) params.set("q", searchQuery.trim());
+      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
       if (filterDateFrom) params.set("dateFrom", filterDateFrom);
       if (filterDateTo) params.set("dateTo", filterDateTo);
       if (filterLocation) params.set("location", filterLocation);
@@ -156,7 +164,7 @@ export default function GalleriaPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, perPage, sortBy, sortOrder, searchQuery, filterDateFrom, filterDateTo, filterLocation, filterCollectionId]);
+  }, [page, perPage, sortBy, sortOrder, debouncedSearch, filterDateFrom, filterDateTo, filterLocation, filterCollectionId]);
 
   useEffect(() => {
     if (activeTab === "all") fetchSlides();
@@ -637,12 +645,15 @@ function AlbumCard({ collection }: { collection: Collection }) {
   return (
     <Link href={`/galleria?view=all&collectionId=${collection.id}`}>
       <Card className="group cursor-pointer overflow-hidden transition-all hover:ring-2 hover:ring-ring/50">
-        <div className="aspect-[4/3] overflow-hidden bg-muted">
+        <div className="relative aspect-[4/3] overflow-hidden bg-muted">
           {coverUrl ? (
-            <img
+            <Image
               src={coverUrl}
               alt={collection.name}
-              className="size-full object-cover transition-transform group-hover:scale-105"
+              fill
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              className="object-cover transition-transform group-hover:scale-105"
+              loading="lazy"
             />
           ) : (
             <div className="flex size-full items-center justify-center">

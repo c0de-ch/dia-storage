@@ -38,7 +38,10 @@ export default function CaricamentoPage() {
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [fileStatuses, setFileStatuses] = useState<FileUploadStatus[]>([]);
   const [overallProgress, setOverallProgress] = useState(0);
-  const cancelledRef = useRef(false);
+  // AbortController aborts the in-flight fetch when the user cancels. A plain
+  // boolean ref only stopped the next iteration -- the current upload kept
+  // burning bytes until it finished.
+  const abortRef = useRef<AbortController | null>(null);
 
   // Optional metadata
   const [magazineName, setMagazineName] = useState("");
@@ -62,13 +65,14 @@ export default function CaricamentoPage() {
   }, []);
 
   const handleCancel = useCallback(() => {
-    cancelledRef.current = true;
+    abortRef.current?.abort();
   }, []);
 
   const handleUpload = useCallback(async () => {
     if (files.length === 0) return;
 
-    cancelledRef.current = false;
+    const controller = new AbortController();
+    abortRef.current = controller;
     setUploadState("uploading");
 
     const statuses: FileUploadStatus[] = files.map((f) => ({
@@ -82,9 +86,10 @@ export default function CaricamentoPage() {
     let completed = 0;
 
     for (let i = 0; i < files.length; i++) {
-      if (cancelledRef.current) {
+      if (controller.signal.aborted) {
         toast("Caricamento annullato");
         setUploadState("ready");
+        abortRef.current = null;
         return;
       }
 
@@ -102,6 +107,7 @@ export default function CaricamentoPage() {
           method: "POST",
           body: formData,
           credentials: "include",
+          signal: controller.signal,
         });
 
         if (!res.ok) {
@@ -125,6 +131,12 @@ export default function CaricamentoPage() {
           statuses[i] = { ...statuses[i], status: "done", progress: 100 };
         }
       } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          toast("Caricamento annullato");
+          setUploadState("ready");
+          abortRef.current = null;
+          return;
+        }
         statuses[i] = {
           ...statuses[i],
           status: "error",
@@ -141,6 +153,7 @@ export default function CaricamentoPage() {
     }
 
     setUploadState("done");
+    abortRef.current = null;
 
     const errors = statuses.filter((s) => s.status === "error").length;
     if (errors === 0) {

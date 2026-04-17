@@ -106,6 +106,16 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
 
   const wasListeningRef = useRef(false);
   const autoStartedRef = useRef(false);
+  // Cancels the in-flight help-bot fetch on unmount or when a new question
+  // starts -- previously the old request would keep running and race with
+  // the new one, so the slow response could overwrite the fast one.
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      fetchAbortRef.current?.abort();
+    };
+  }, []);
 
   // Auto-start mic on mount if requested and voice mode is on
   useEffect(() => {
@@ -197,11 +207,17 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
       setInputValue("");
       setIsLoading(true);
 
+      // Cancel any previous in-flight question before starting the next one.
+      fetchAbortRef.current?.abort();
+      const controller = new AbortController();
+      fetchAbortRef.current = controller;
+
       try {
         const res = await fetch("/api/v1/help-bot", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
+          signal: controller.signal,
           body: JSON.stringify({
             message: trimmed,
             lang,
@@ -235,7 +251,11 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
           setMessages((prev) => [...prev, botMsg]);
           speakIfVoice(fullAnswer);
         }
-      } catch {
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          // Superseded by a newer question or unmount -- silently drop.
+          return;
+        }
         const errorText = "Errore di connessione. Riprova.";
         if (!quickMatch) {
           const errorMsg: ChatMessage = {
@@ -247,6 +267,9 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
         }
         speakIfVoice(errorText);
       } finally {
+        if (fetchAbortRef.current === controller) {
+          fetchAbortRef.current = null;
+        }
         setIsLoading(false);
       }
     },

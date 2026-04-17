@@ -41,6 +41,7 @@ next-env.d.ts
 
 # data storage
 data/
+storage/
 
 # uploads temp
 uploads/
