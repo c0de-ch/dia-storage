@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth } from '@/lib/auth/middleware';
+import { parseIdParam } from '@/lib/api/params';
 import { t } from '@/lib/i18n';
 import { eq, and, inArray } from 'drizzle-orm';
 
 export const POST = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
     const body = await request.json();
     const { slideIds } = body;
 
@@ -84,7 +87,9 @@ export const POST = withAuth(async (request: NextRequest, context) => {
 export const DELETE = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
     const { searchParams } = new URL(request.url);
     const slideId = searchParams.get('slideId');
 
@@ -95,7 +100,9 @@ export const DELETE = withAuth(async (request: NextRequest, context) => {
       );
     }
 
-    const numericSlideId = Number(slideId);
+    const parsedSlide = parseIdParam(slideId);
+    if (!parsedSlide.ok) return parsedSlide.response;
+    const numericSlideId = parsedSlide.id;
 
     const [collection] = await db
       .select()

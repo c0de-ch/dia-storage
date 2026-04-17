@@ -3,13 +3,17 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canEditMagazine, canDeleteMagazine } from '@/lib/auth/permissions';
+import { parseIdParam } from '@/lib/api/params';
+import { parseJsonBody, magazinePatchSchema } from '@/lib/api/validation';
 import { t } from '@/lib/i18n';
-import { eq } from 'drizzle-orm';
+import { eq, and, ne } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
 
     const [magazine] = await db
       .select()
@@ -27,7 +31,12 @@ export const GET = withAuth(async (request: NextRequest, context) => {
     const slides = await db
       .select()
       .from(schema.slides)
-      .where(eq(schema.slides.magazineId, numericId));
+      .where(
+        and(
+          eq(schema.slides.magazineId, numericId),
+          ne(schema.slides.status, 'deleted')
+        )
+      );
 
     return NextResponse.json({
       success: true,
@@ -48,8 +57,12 @@ export const GET = withAuth(async (request: NextRequest, context) => {
 export const PATCH = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
-    const body = await request.json();
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
+
+    const parsedBody = await parseJsonBody(request, magazinePatchSchema);
+    if (!parsedBody.ok) return parsedBody.response;
 
     const [existing] = await db
       .select()
@@ -72,10 +85,7 @@ export const PATCH = withAuth(async (request: NextRequest, context) => {
       );
     }
 
-    const updateData: Record<string, unknown> = {};
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.description !== undefined) updateData.description = body.description;
-    updateData.updatedAt = new Date();
+    const updateData: Record<string, unknown> = { ...parsedBody.data, updatedAt: new Date() };
 
     const [updatedMagazine] = await db
       .update(schema.magazines)
@@ -99,7 +109,9 @@ export const PATCH = withAuth(async (request: NextRequest, context) => {
 export const DELETE = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
 
     const [existing] = await db
       .select()

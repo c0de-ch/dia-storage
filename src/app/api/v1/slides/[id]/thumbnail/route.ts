@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth } from '@/lib/auth/middleware';
+import { parseIdParam } from '@/lib/api/params';
 import { eq } from 'drizzle-orm';
 import { readFile, writeFile, mkdir, access } from 'fs/promises';
 import sharp from 'sharp';
@@ -13,7 +14,9 @@ const UPLOAD_DIR = process.env.STORAGE_PATH || './storage';
 export const GET = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
 
     const [slide] = await db
       .select()

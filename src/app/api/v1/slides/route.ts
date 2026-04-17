@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth } from '@/lib/auth/middleware';
 import { t } from '@/lib/i18n';
-import { eq, and, desc, asc, count, ilike, gte, lte, or } from 'drizzle-orm';
+import { eq, and, desc, asc, count, ilike, gte, lte, or, ne } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {
   try {
@@ -24,6 +24,9 @@ export const GET = withAuth(async (request: NextRequest) => {
     const conditions = [];
     if (status) {
       conditions.push(eq(schema.slides.status, status));
+    } else {
+      // Hide soft-deleted rows unless caller explicitly asks for them.
+      conditions.push(ne(schema.slides.status, 'deleted'));
     }
     if (magazineId) {
       conditions.push(eq(schema.slides.magazineId, Number(magazineId)));

@@ -3,13 +3,17 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canEditSlide, canDeleteSlide } from '@/lib/auth/permissions';
+import { parseIdParam } from '@/lib/api/params';
+import { parseJsonBody, slidePatchSchema } from '@/lib/api/validation';
 import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
 
     const [slide] = await db
       .select()
@@ -40,8 +44,12 @@ export const GET = withAuth(async (request: NextRequest, context) => {
 export const PATCH = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
-    const body = await request.json();
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
+
+    const parsedBody = await parseJsonBody(request, slidePatchSchema);
+    if (!parsedBody.ok) return parsedBody.response;
 
     const [existingSlide] = await db
       .select()
@@ -64,18 +72,7 @@ export const PATCH = withAuth(async (request: NextRequest, context) => {
       );
     }
 
-    const allowedFields = [
-      'title', 'dateTaken', 'location',
-      'magazineId', 'slotNumber', 'notes', 'status',
-    ];
-
-    const updateData: Record<string, unknown> = {};
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field];
-      }
-    }
-    updateData.updatedAt = new Date();
+    const updateData: Record<string, unknown> = { ...parsedBody.data, updatedAt: new Date() };
 
     const [updatedSlide] = await db
       .update(schema.slides)
@@ -99,7 +96,9 @@ export const PATCH = withAuth(async (request: NextRequest, context) => {
 export const DELETE = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
 
     const [existingSlide] = await db
       .select()

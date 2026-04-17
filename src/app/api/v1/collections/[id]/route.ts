@@ -3,13 +3,17 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canEditCollection, canDeleteCollection } from '@/lib/auth/permissions';
+import { parseIdParam } from '@/lib/api/params';
+import { parseJsonBody, collectionPatchSchema } from '@/lib/api/validation';
 import { t } from '@/lib/i18n';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, and, ne, inArray } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
 
     const [collection] = await db
       .select()
@@ -36,7 +40,12 @@ export const GET = withAuth(async (request: NextRequest, context) => {
       slides = await db
         .select()
         .from(schema.slides)
-        .where(inArray(schema.slides.id, slideIds));
+        .where(
+          and(
+            inArray(schema.slides.id, slideIds),
+            ne(schema.slides.status, 'deleted')
+          )
+        );
     }
 
     return NextResponse.json({
@@ -58,8 +67,12 @@ export const GET = withAuth(async (request: NextRequest, context) => {
 export const PATCH = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
-    const body = await request.json();
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
+
+    const parsedBody = await parseJsonBody(request, collectionPatchSchema);
+    if (!parsedBody.ok) return parsedBody.response;
 
     const [existing] = await db
       .select()
@@ -82,10 +95,7 @@ export const PATCH = withAuth(async (request: NextRequest, context) => {
       );
     }
 
-    const updateData: Record<string, unknown> = {};
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.description !== undefined) updateData.description = body.description;
-    updateData.updatedAt = new Date();
+    const updateData: Record<string, unknown> = { ...parsedBody.data, updatedAt: new Date() };
 
     const [updatedCollection] = await db
       .update(schema.collections)
@@ -109,7 +119,9 @@ export const PATCH = withAuth(async (request: NextRequest, context) => {
 export const DELETE = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
 
     const [existing] = await db
       .select()
@@ -132,14 +144,15 @@ export const DELETE = withAuth(async (request: NextRequest, context) => {
       );
     }
 
-    // Remove all slide associations first
-    await db
-      .delete(schema.slideCollections)
-      .where(eq(schema.slideCollections.collectionId, numericId));
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(schema.slideCollections)
+        .where(eq(schema.slideCollections.collectionId, numericId));
 
-    await db
-      .delete(schema.collections)
-      .where(eq(schema.collections.id, numericId));
+      await tx
+        .delete(schema.collections)
+        .where(eq(schema.collections.id, numericId));
+    });
 
     return NextResponse.json({
       success: true,

@@ -3,13 +3,16 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canManageApiKeys } from '@/lib/auth/permissions';
+import { parseIdParam } from '@/lib/api/params';
 import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
 
 export const DELETE = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
 
     const [existingKey] = await db
       .select()

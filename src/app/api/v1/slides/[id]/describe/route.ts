@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth } from '@/lib/auth/middleware';
+import { parseIdParam } from '@/lib/api/params';
 import { eq } from 'drizzle-orm';
 import { readFile, access } from 'fs/promises';
 import { readImageBuffer } from '@/lib/images/heic';
@@ -19,7 +20,9 @@ async function getSetting(key: string): Promise<string | null> {
 export const POST = withAuth(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
     const { lang } = await request.json().catch(() => ({ lang: 'it-IT' }));
 
     const [slide] = await db

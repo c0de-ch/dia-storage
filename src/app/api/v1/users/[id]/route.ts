@@ -2,15 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAdmin } from '@/lib/auth/middleware';
+import { parseIdParam } from '@/lib/api/params';
+import { parseJsonBody, userPatchSchema } from '@/lib/api/validation';
 import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
 
 export const PATCH = withAdmin(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
-    const body = await request.json();
-    const { email, phone, name, role, otpChannel } = body;
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
+
+    const parsedBody = await parseJsonBody(request, userPatchSchema);
+    if (!parsedBody.ok) return parsedBody.response;
 
     const [existingUser] = await db
       .select()
@@ -25,27 +30,7 @@ export const PATCH = withAdmin(async (request: NextRequest, context) => {
       );
     }
 
-    if (role && !['admin', 'operator', 'viewer'].includes(role)) {
-      return NextResponse.json(
-        { success: false, message: 'Ruolo non valido. Valori ammessi: admin, operator, viewer.' },
-        { status: 400 }
-      );
-    }
-
-    if (otpChannel && !['email', 'whatsapp'].includes(otpChannel)) {
-      return NextResponse.json(
-        { success: false, message: 'Canale OTP non valido. Valori ammessi: email, whatsapp.' },
-        { status: 400 }
-      );
-    }
-
-    const updateData: Record<string, unknown> = {};
-    if (email !== undefined) updateData.email = email;
-    if (phone !== undefined) updateData.phone = phone;
-    if (name !== undefined) updateData.name = name;
-    if (role !== undefined) updateData.role = role;
-    if (otpChannel !== undefined) updateData.otpChannel = otpChannel;
-    updateData.updatedAt = new Date();
+    const updateData: Record<string, unknown> = { ...parsedBody.data, updatedAt: new Date() };
 
     const [updatedUser] = await db
       .update(schema.users)
@@ -69,7 +54,9 @@ export const PATCH = withAdmin(async (request: NextRequest, context) => {
 export const DELETE = withAdmin(async (request: NextRequest, context) => {
   try {
     const { id } = await (context as { params: Promise<{ id: string }> }).params;
-    const numericId = Number(id);
+    const parsed = parseIdParam(id);
+    if (!parsed.ok) return parsed.response;
+    const numericId = parsed.id;
 
     const [existingUser] = await db
       .select()

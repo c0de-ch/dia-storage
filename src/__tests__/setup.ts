@@ -10,9 +10,11 @@ vi.mock("next/headers", () => ({
   headers: vi.fn(() => new Map()),
 }));
 
-// Mock database by default — tests can override
-vi.mock("@/lib/db", () => ({
-  db: {
+// Mock database by default — tests can override.
+// Transactions invoke the callback with the same `db` reference so per-test
+// mocks like `vi.mocked(db.insert).mockReturnValue(...)` apply inside tx too.
+vi.mock("@/lib/db", () => {
+  const db: Record<string, unknown> = {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(() => ({
@@ -42,5 +44,7 @@ vi.mock("@/lib/db", () => ({
       where: vi.fn(() => ({})),
     })),
     execute: vi.fn(),
-  },
-}));
+  };
+  db.transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(db));
+  return { db };
+});

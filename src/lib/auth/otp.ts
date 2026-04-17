@@ -28,15 +28,32 @@ export async function createOtpCode(
 ): Promise<string> {
   const config = getConfig();
   const code = generateOtp();
+  const normalizedEmail = email.toLowerCase().trim();
+  const now = new Date();
   const expiresAt = new Date(
-    Date.now() + config.auth.otpExpiryMinutes * 60 * 1000
+    now.getTime() + config.auth.otpExpiryMinutes * 60 * 1000
   );
 
-  await db.insert(otpCodes).values({
-    email: email.toLowerCase().trim(),
-    code,
-    channel,
-    expiresAt,
+  await db.transaction(async (tx) => {
+    // Invalidate any prior unused, unexpired codes for this email so only the
+    // latest code can authenticate — prevents stacking and shrinks guess surface.
+    await tx
+      .update(otpCodes)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(otpCodes.email, normalizedEmail),
+          isNull(otpCodes.usedAt),
+          gt(otpCodes.expiresAt, now)
+        )
+      );
+
+    await tx.insert(otpCodes).values({
+      email: normalizedEmail,
+      code,
+      channel,
+      expiresAt,
+    });
   });
 
   return code;
