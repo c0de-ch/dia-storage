@@ -242,6 +242,7 @@ export default function GalleriaPage() {
   function handleSortChange(value: string | null) {
     if (!value) return;
     const [newSortBy, newSortOrder] = value.split(":");
+    if (!newSortBy || !newSortOrder) return;
     setSortBy(newSortBy);
     setSortOrder(newSortOrder);
     setPage(1);

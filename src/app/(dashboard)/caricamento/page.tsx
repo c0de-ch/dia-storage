@@ -92,12 +92,16 @@ export default function CaricamentoPage() {
         return;
       }
 
-      statuses[i] = { ...statuses[i], status: "uploading", progress: 0 };
+      const file = files[i];
+      const current = statuses[i];
+      if (!file || !current) continue;
+
+      statuses[i] = { ...current, status: "uploading", progress: 0 };
       setFileStatuses([...statuses]);
 
       try {
         const formData = new FormData();
-        formData.append("file", files[i]);
+        formData.append("file", file);
         if (magazineName) formData.append("magazineName", magazineName);
         if (date) formData.append("date", date);
         if (location) formData.append("location", location);
@@ -111,7 +115,7 @@ export default function CaricamentoPage() {
 
         if (!res.ok) {
           throw new Error(
-            t("upload.fileFailed", { name: files[i].name })
+            t("upload.fileFailed", { name: file.name })
           );
         }
 
@@ -120,14 +124,14 @@ export default function CaricamentoPage() {
         const fileResult = data.results?.[0];
         if (fileResult && fileResult.duplicate) {
           statuses[i] = {
-            ...statuses[i],
+            ...current,
             status: "error",
             progress: 100,
             error: fileResult.message,
           };
-          toast.warning(`${files[i].name}: ${fileResult.message}`);
+          toast.warning(`${file.name}: ${fileResult.message}`);
         } else {
-          statuses[i] = { ...statuses[i], status: "done", progress: 100 };
+          statuses[i] = { ...current, status: "done", progress: 100 };
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
@@ -137,7 +141,7 @@ export default function CaricamentoPage() {
           return;
         }
         statuses[i] = {
-          ...statuses[i],
+          ...current,
           status: "error",
           progress: 0,
           error:

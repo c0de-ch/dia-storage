@@ -12,6 +12,7 @@ export const GET = withAuth(async (request: NextRequest) => {
     const offset = (page - 1) * limit;
 
     const [totalResult] = await db.select({ total: count() }).from(schema.collections);
+    const total = totalResult?.total ?? 0;
 
     const collections = await db
       .select()
@@ -26,8 +27,8 @@ export const GET = withAuth(async (request: NextRequest) => {
       pagination: {
         page,
         limit,
-        total: totalResult.total,
-        totalPages: Math.ceil(totalResult.total / limit),
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {

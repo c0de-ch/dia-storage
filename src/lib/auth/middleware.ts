@@ -94,14 +94,15 @@ export function withApiKey(handler: AuthenticatedHandler): RouteHandler {
       .where(eq(apiKeys.key, hashedKey))
       .limit(1);
 
-    if (rows.length === 0) {
+    const firstRow = rows[0];
+    if (!firstRow) {
       return NextResponse.json(
         { error: t("errors.invalidApiKey") },
         { status: 401 }
       );
     }
 
-    const { apiKey, user } = rows[0];
+    const { apiKey, user } = firstRow;
 
     if (!user.active) {
       return NextResponse.json(

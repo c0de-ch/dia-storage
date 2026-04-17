@@ -57,9 +57,11 @@ function envOverrides(): Record<string, unknown> {
     const stripped = envKey.slice(PREFIX.length); // e.g. "APP__NAME"
     const parts = stripped.split("__"); // ["APP", "NAME"]
     if (parts.length !== 2) continue;
+    const [rawSection, rawFieldUpper] = parts;
+    if (!rawSection || !rawFieldUpper) continue;
 
-    const section = parts[0].toLowerCase(); // "app"
-    const rawField = parts[1].toLowerCase(); // "name"
+    const section = rawSection.toLowerCase(); // "app"
+    const rawField = rawFieldUpper.toLowerCase(); // "name"
 
     // Convert snake_case to camelCase
     const field = rawField.replace(/_([a-z])/g, (_, c: string) =>

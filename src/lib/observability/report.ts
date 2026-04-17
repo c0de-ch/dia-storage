@@ -44,17 +44,21 @@ export function reportError(
   err: unknown,
   fields?: LogFields,
 ): void {
-  const error =
+  const error: Report["error"] =
     err instanceof Error
-      ? { name: err.name, message: err.message, stack: err.stack }
+      ? {
+          name: err.name,
+          message: err.message,
+          ...(err.stack !== undefined && { stack: err.stack }),
+        }
       : { name: "NonErrorThrown", message: String(err) };
 
   emit({
     level: "error",
     scope,
-    message: error.message,
+    message: error?.message ?? "",
     timestamp: new Date().toISOString(),
-    fields,
+    ...(fields !== undefined && { fields }),
     error,
   });
 }
@@ -70,6 +74,6 @@ export function reportEvent(
     scope,
     message,
     timestamp: new Date().toISOString(),
-    fields,
+    ...(fields !== undefined && { fields }),
   });
 }

@@ -19,9 +19,9 @@ export const GET = withAuth(async (_request: NextRequest) => {
     ]);
 
     return NextResponse.json({
-      totalSlides: slideStats.total,
-      incomingCount: slideStats.incoming ?? 0,
-      magazinesCount: magazinesResult.total,
+      totalSlides: slideStats?.total ?? 0,
+      incomingCount: slideStats?.incoming ?? 0,
+      magazinesCount: magazinesResult?.total ?? 0,
     });
   } catch (error) {
     console.error('Errore nel recupero delle statistiche:', error);

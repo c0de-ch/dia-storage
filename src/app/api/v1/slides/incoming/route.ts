@@ -15,6 +15,7 @@ export const GET = withAuth(async (request: NextRequest) => {
       .select({ total: count() })
       .from(schema.slides)
       .where(eq(schema.slides.status, 'incoming'));
+    const total = totalResult?.total ?? 0;
 
     const slides = await db
       .select()
@@ -24,16 +25,18 @@ export const GET = withAuth(async (request: NextRequest) => {
       .limit(limit)
       .offset(offset);
 
-    const batches: Record<string, typeof slides> = {};
+    const batches = new Map<string, typeof slides>();
     for (const slide of slides) {
       const batchId = slide.batchId || 'senza-batch';
-      if (!batches[batchId]) {
-        batches[batchId] = [];
+      let bucket = batches.get(batchId);
+      if (!bucket) {
+        bucket = [];
+        batches.set(batchId, bucket);
       }
-      batches[batchId].push(slide);
+      bucket.push(slide);
     }
 
-    const groupedBatches = Object.entries(batches).map(([batchId, batchSlides]) => ({
+    const groupedBatches = Array.from(batches.entries()).map(([batchId, batchSlides]) => ({
       batchId,
       count: batchSlides.length,
       slides: batchSlides,
@@ -43,12 +46,12 @@ export const GET = withAuth(async (request: NextRequest) => {
     return NextResponse.json({
       success: true,
       batches: groupedBatches,
-      total: totalResult.total,
+      total,
       pagination: {
         page,
         limit,
-        total: totalResult.total,
-        totalPages: Math.ceil(totalResult.total / limit),
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {

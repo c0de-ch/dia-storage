@@ -20,12 +20,13 @@ async function main() {
   if (!key) {
     console.log("Nessuna chiave specificata, cerco l'ultimo dump in db-backups/ ...");
     const objects = await listS3Keys("db-backups/");
-    if (objects.length === 0) {
+    const latest = objects[0];
+    if (!latest) {
       console.error("Nessun backup trovato in db-backups/.");
       process.exit(1);
     }
-    key = objects[0].key;
-    console.log(`Uso il backup più recente: ${key} (${objects[0].lastModified.toISOString()})`);
+    key = latest.key;
+    console.log(`Uso il backup più recente: ${key} (${latest.lastModified.toISOString()})`);
   }
 
   if (process.env.CONFIRM !== "yes") {

@@ -163,7 +163,7 @@ function FileThumb({
 }: {
   file: File;
   index: number;
-  onRemove?: (i: number) => void;
+  onRemove: ((i: number) => void) | undefined;
 }) {
   const [src, setSrc] = useState<string | null>(null);
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";

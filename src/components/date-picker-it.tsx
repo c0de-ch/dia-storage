@@ -45,7 +45,7 @@ function parseItalianDate(text: string): Date | null {
 
   // Try yyyy only
   const yearMatch = trimmed.match(/^(\d{4})$/);
-  if (yearMatch) {
+  if (yearMatch?.[1]) {
     const d = new Date(parseInt(yearMatch[1]), 0, 1);
     return isValid(d) ? d : null;
   }
@@ -132,13 +132,12 @@ export function DatePickerIt({
         <PopoverContent className="w-auto p-0" align="end">
           <Calendar
             mode="single"
-            selected={calendarDate}
             onSelect={handleCalendarSelect}
             locale={it}
             captionLayout="dropdown"
-            defaultMonth={calendarDate}
             fromYear={1900}
             toYear={new Date().getFullYear()}
+            {...(calendarDate && { selected: calendarDate, defaultMonth: calendarDate })}
           />
         </PopoverContent>
       </Popover>

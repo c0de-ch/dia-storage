@@ -252,6 +252,9 @@ export async function runIncrementalBackup(): Promise<{
       status: 'in_progress',
     })
     .returning();
+  if (!historyRow) {
+    throw new Error('Impossibile creare la riga di cronologia backup S3.');
+  }
 
   let totalBytes = 0;
   const backedUpIds: number[] = [];

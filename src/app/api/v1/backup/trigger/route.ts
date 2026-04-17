@@ -20,6 +20,12 @@ export const POST = withAdmin(async (request: NextRequest) => {
       destination,
       status: 'in_progress',
     }).returning();
+    if (!backup) {
+      return NextResponse.json(
+        { success: false, message: 'Errore interno del server.' },
+        { status: 500 }
+      );
+    }
 
     // Trigger backup process asynchronously
     // The actual backup logic would be handled by a background job

@@ -34,9 +34,9 @@ export async function POST(request: NextRequest) {
         },
         {
           status: 429,
-          headers: rate.retryAfterSeconds
-            ? { 'Retry-After': String(rate.retryAfterSeconds) }
-            : undefined,
+          ...(rate.retryAfterSeconds && {
+            headers: { 'Retry-After': String(rate.retryAfterSeconds) },
+          }),
         }
       );
     }

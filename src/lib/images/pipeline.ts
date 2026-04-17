@@ -125,6 +125,9 @@ export async function processIncomingImage(
       status: 'incoming',
     })
     .returning();
+  if (!slide) {
+    throw new Error('Inserimento slide fallito.');
+  }
 
   // Update batch slide count
   await db

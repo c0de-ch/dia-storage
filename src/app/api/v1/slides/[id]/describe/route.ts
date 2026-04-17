@@ -79,7 +79,7 @@ export const POST = withAuth(async (request: NextRequest, context) => {
       'de-DE': 'Beschreibe detailliert, was du in diesem Bild siehst. Es handelt sich um ein digitalisiertes 35-mm-Dia. Beschreibe Personen, Orte, Objekte und Atmosphare. Antworte auf Deutsch.',
       'fr-FR': 'Decris en detail ce que tu vois dans cette image. C\'est une diapositive 35mm numerisee. Decris les personnes, les lieux, les objets et l\'atmosphere. Reponds en francais.',
     };
-    const prompt = langPrompts[lang] ?? langPrompts['it-IT'];
+    const prompt = langPrompts[lang] ?? langPrompts['it-IT']!;
 
     if (provider === 'ollama') {
       const res = await fetch(`${ollamaUrl}/api/chat`, {
@@ -149,8 +149,9 @@ export const POST = withAuth(async (request: NextRequest, context) => {
       ],
     });
 
-    const description = response.content[0].type === 'text'
-      ? response.content[0].text
+    const firstBlock = response.content[0];
+    const description = firstBlock?.type === 'text'
+      ? firstBlock.text
       : 'Non sono riuscito a descrivere l\'immagine.';
 
     return NextResponse.json({ success: true, description });

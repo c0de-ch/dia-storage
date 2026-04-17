@@ -39,8 +39,8 @@ async function seed() {
       .where(eq(users.email, ADMIN_EMAIL))
       .limit(1);
 
-    if (existing.length > 0) {
-      const user = existing[0];
+    const user = existing[0];
+    if (user) {
       console.log(`Utente admin già esistente (id: ${user.id})`);
 
       // Ensure role is admin
@@ -73,7 +73,9 @@ async function seed() {
         })
         .returning({ id: users.id });
 
-      console.log(`Utente admin creato con id: ${result[0].id}`);
+      const created = result[0];
+      if (!created) throw new Error("Inserimento utente admin fallito.");
+      console.log(`Utente admin creato con id: ${created.id}`);
     }
 
     console.log();

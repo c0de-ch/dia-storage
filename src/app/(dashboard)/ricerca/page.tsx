@@ -87,15 +87,16 @@ export default function RicercaPage() {
   }, []);
 
   const doSearch = useCallback(
-    async (searchPage = 1) => {
+    async (searchPage = 1, queryOverride?: string) => {
       setLoading(true);
       setSearched(true);
       try {
+        const effectiveQuery = (queryOverride ?? query).trim();
         const params = new URLSearchParams({
           page: String(searchPage),
           limit: "50",
         });
-        if (query.trim()) params.set("q", query.trim());
+        if (effectiveQuery) params.set("q", effectiveQuery);
         if (dateFrom) params.set("dateFrom", dateFrom);
         if (dateTo) params.set("dateTo", dateTo);
         if (magazineFilter) params.set("magazineId", magazineFilter);
@@ -139,21 +140,7 @@ export default function RicercaPage() {
   function handleSuggestionClick(suggestion: string) {
     setQuery(suggestion);
     setPage(1);
-    // Trigger search after updating query
-    setTimeout(() => {
-      const params = new URLSearchParams({ q: suggestion, page: "1", limit: "50" });
-      setLoading(true);
-      setSearched(true);
-      fetch(`/api/v1/search?${params}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.success) {
-            setSlides(data.slides);
-            setPagination(data.pagination);
-          }
-        })
-        .finally(() => setLoading(false));
-    }, 0);
+    doSearch(1, suggestion);
   }
 
   function getPageNumbers(): (number | "ellipsis")[] {

@@ -123,7 +123,7 @@ export async function checkAuthRateLimit(
 
 function clientIp(headers: Headers): string | null {
   const fwd = headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
+  if (fwd) return fwd.split(",")[0]?.trim() ?? null;
   return headers.get("x-real-ip");
 }
 

@@ -135,6 +135,9 @@ export async function runNasBackup(): Promise<{
       status: 'in_progress',
     })
     .returning();
+  if (!historyRow) {
+    throw new Error('Impossibile creare la riga di cronologia backup NAS.');
+  }
 
   let totalBytes = 0;
   const backedUpIds: number[] = [];

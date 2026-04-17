@@ -74,7 +74,8 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions): Use
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let full = "";
       for (let i = 0; i < event.results.length; i++) {
-        full += event.results[i][0].transcript;
+        const alt = event.results[i]?.[0];
+        if (alt) full += alt.transcript;
       }
       setTranscript(full);
       setLastSpeechTime(Date.now());

@@ -57,7 +57,7 @@ export const GET = withAuth(async (request: NextRequest) => {
       .from(schema.slides)
       .where(whereClause);
 
-    const total = totalResult.total;
+    const total = totalResult?.total ?? 0;
 
     const orderFn = sortOrder === 'asc' ? asc : desc;
     const orderExpr = sortBy === 'title' ? orderFn(schema.slides.title)

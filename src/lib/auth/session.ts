@@ -44,11 +44,12 @@ export async function validateSession(
     .where(and(eq(userSessions.token, token), gt(userSessions.expiresAt, new Date())))
     .limit(1);
 
-  if (rows.length === 0) {
+  const firstRow = rows[0];
+  if (!firstRow) {
     return null;
   }
 
-  const { user } = rows[0];
+  const { user } = firstRow;
 
   // Check if user is still active
   if (!user.active) {

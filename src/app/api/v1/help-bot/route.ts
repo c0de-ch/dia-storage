@@ -91,7 +91,8 @@ ${KNOWLEDGE}
 };
 
 function getSystemPrompt(lang?: string): string {
-  return SYSTEM_PROMPTS[lang ?? "it-IT"] ?? SYSTEM_PROMPTS["it-IT"];
+  const fallback = SYSTEM_PROMPTS["it-IT"]!;
+  return SYSTEM_PROMPTS[lang ?? "it-IT"] ?? fallback;
 }
 
 async function getSetting(key: string): Promise<string | null> {
@@ -243,9 +244,10 @@ export const POST = withAuth(async (request: NextRequest) => {
       messages,
     });
 
+    const firstBlock = response.content[0];
     const text =
-      response.content[0].type === "text"
-        ? response.content[0].text
+      firstBlock?.type === "text"
+        ? firstBlock.text
         : "Non sono riuscito a generare una risposta.";
 
     // Track usage

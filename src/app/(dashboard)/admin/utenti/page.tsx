@@ -124,7 +124,7 @@ function UserFormDialog({
   onOpenChange,
   onSaved,
 }: {
-  user?: User;
+  user: User | undefined;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;

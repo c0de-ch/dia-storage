@@ -81,11 +81,10 @@ export async function validateOtpCode(
     )
     .limit(1);
 
-  if (rows.length === 0) {
+  const otpRecord = rows[0];
+  if (!otpRecord) {
     return false;
   }
-
-  const otpRecord = rows[0];
 
   // Mark as used
   await db
