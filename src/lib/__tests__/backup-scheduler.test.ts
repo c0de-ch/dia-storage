@@ -26,9 +26,25 @@ vi.mock("@/lib/backup/nas", () => ({
   runNasBackup: (...args: unknown[]) => mockRunNasBackup(...args),
 }));
 
+const mockBackupDatabaseToS3 = vi.fn();
+vi.mock("@/lib/backup/database", () => ({
+  backupDatabaseToS3: (...args: unknown[]) => mockBackupDatabaseToS3(...args),
+}));
+
 const mockGetConfig = vi.fn();
 vi.mock("@/lib/config/loader", () => ({
   getConfig: () => mockGetConfig(),
+}));
+
+const mockExecute = vi.fn();
+const mockTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+  fn({ execute: mockExecute }),
+);
+vi.mock("@/lib/db", () => ({
+  db: {
+    transaction: (fn: (tx: unknown) => Promise<unknown>) => mockTransaction(fn),
+    execute: (...args: unknown[]) => mockExecute(...args),
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -59,6 +75,10 @@ function makeConfig(overrides?: {
   };
 }
 
+function mockLockAcquired(acquired: boolean) {
+  mockExecute.mockResolvedValue([{ acquired }]);
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -70,6 +90,8 @@ describe("startBackupScheduler", () => {
     stopBackupScheduler();
     mockGetConfig.mockReturnValue(makeConfig());
     mockValidate.mockReturnValue(true);
+    mockLockAcquired(true);
+    mockTransaction.mockImplementation(async (fn) => fn({ execute: mockExecute }));
   });
 
   it("creates a cron job with the configured schedule", () => {
@@ -129,6 +151,8 @@ describe("stopBackupScheduler", () => {
     stopBackupScheduler();
     mockGetConfig.mockReturnValue(makeConfig());
     mockValidate.mockReturnValue(true);
+    mockLockAcquired(true);
+    mockTransaction.mockImplementation(async (fn) => fn({ execute: mockExecute }));
   });
 
   it("stops the scheduled task", () => {
@@ -159,6 +183,8 @@ describe("isSchedulerRunning", () => {
     stopBackupScheduler();
     mockGetConfig.mockReturnValue(makeConfig());
     mockValidate.mockReturnValue(true);
+    mockLockAcquired(true);
+    mockTransaction.mockImplementation(async (fn) => fn({ execute: mockExecute }));
   });
 
   it("returns false when not started", () => {
@@ -182,8 +208,11 @@ describe("scheduled task callback", () => {
     vi.clearAllMocks();
     stopBackupScheduler();
     mockValidate.mockReturnValue(true);
+    mockLockAcquired(true);
+    mockTransaction.mockImplementation(async (fn) => fn({ execute: mockExecute }));
     mockRunIncrementalBackup.mockResolvedValue({ uploaded: 1, errors: [] });
     mockRunNasBackup.mockResolvedValue({ copied: 1, errors: [] });
+    mockBackupDatabaseToS3.mockResolvedValue("db-backups/test.dump");
   });
 
   it("runs S3 backup when s3 destination is configured", async () => {
@@ -199,6 +228,29 @@ describe("scheduled task callback", () => {
     expect(mockRunNasBackup).not.toHaveBeenCalled();
   });
 
+  it("also uploads a DB dump when s3 destination is configured", async () => {
+    mockGetConfig.mockReturnValue(makeConfig({ destinations: [{ type: "s3" }] }));
+
+    startBackupScheduler();
+
+    const callback = mockSchedule.mock.calls[0][1] as () => Promise<void>;
+    await callback();
+
+    expect(mockBackupDatabaseToS3).toHaveBeenCalled();
+  });
+
+  it("does not abort file backup when DB dump fails", async () => {
+    mockGetConfig.mockReturnValue(makeConfig({ destinations: [{ type: "s3" }] }));
+    mockBackupDatabaseToS3.mockRejectedValue(new Error("pg_dump down"));
+
+    startBackupScheduler();
+
+    const callback = mockSchedule.mock.calls[0][1] as () => Promise<void>;
+    await expect(callback()).resolves.toBeUndefined();
+
+    expect(mockRunIncrementalBackup).toHaveBeenCalled();
+  });
+
   it("runs NAS backup when local destination is configured", async () => {
     mockGetConfig.mockReturnValue(makeConfig({ destinations: [{ type: "local" }] }));
 
@@ -209,6 +261,7 @@ describe("scheduled task callback", () => {
 
     expect(mockRunNasBackup).toHaveBeenCalled();
     expect(mockRunIncrementalBackup).not.toHaveBeenCalled();
+    expect(mockBackupDatabaseToS3).not.toHaveBeenCalled();
   });
 
   it("runs NAS backup when smb destination is configured", async () => {
@@ -236,31 +289,18 @@ describe("scheduled task callback", () => {
     expect(mockRunNasBackup).toHaveBeenCalled();
   });
 
-  it("skips execution when a backup is already in progress", async () => {
+  it("skips execution when the advisory lock is already held", async () => {
     mockGetConfig.mockReturnValue(makeConfig({ destinations: [{ type: "s3" }] }));
-
-    // Make the backup hang
-    let resolveBackup!: () => void;
-    mockRunIncrementalBackup.mockImplementation(
-      () => new Promise<{ uploaded: number; errors: never[] }>((r) => {
-        resolveBackup = () => r({ uploaded: 0, errors: [] });
-      }),
-    );
+    mockLockAcquired(false);
 
     startBackupScheduler();
 
     const callback = mockSchedule.mock.calls[0][1] as () => Promise<void>;
-
-    // Start first execution (it will hang)
-    const first = callback();
-    // Start second execution (should be skipped because isRunning=true)
     await callback();
 
-    expect(mockRunIncrementalBackup).toHaveBeenCalledTimes(1);
-
-    // Clean up: resolve the hanging backup
-    resolveBackup();
-    await first;
+    expect(mockRunIncrementalBackup).not.toHaveBeenCalled();
+    expect(mockBackupDatabaseToS3).not.toHaveBeenCalled();
+    expect(mockRunNasBackup).not.toHaveBeenCalled();
   });
 
   it("handles errors in backup gracefully", async () => {
@@ -275,16 +315,15 @@ describe("scheduled task callback", () => {
     await expect(callback()).resolves.toBeUndefined();
   });
 
-  it("resets isRunning even when backup throws", async () => {
+  it("allows subsequent runs after a backup throws", async () => {
     mockGetConfig.mockReturnValue(makeConfig({ destinations: [{ type: "s3" }] }));
-    mockRunIncrementalBackup.mockRejectedValue(new Error("S3 down"));
+    mockRunIncrementalBackup.mockRejectedValueOnce(new Error("S3 down"));
 
     startBackupScheduler();
 
     const callback = mockSchedule.mock.calls[0][1] as () => Promise<void>;
     await callback();
 
-    // Should be able to run again (isRunning was reset)
     mockRunIncrementalBackup.mockResolvedValue({ uploaded: 0, errors: [] });
     await callback();
     expect(mockRunIncrementalBackup).toHaveBeenCalledTimes(2);

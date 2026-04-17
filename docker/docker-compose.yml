@@ -14,10 +14,16 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://dia:dia@db:5432/dia_storage
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://localhost:3000/api/v1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
 
   db:
-    image: postgres:17-alpine
+    image: postgres:17.2-alpine
     volumes:
       - db-data:/var/lib/postgresql/data
     environment:
@@ -33,7 +39,7 @@ services:
     restart: unless-stopped
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.8-alpine
     ports:
       - "80:80"
       - "443:443"

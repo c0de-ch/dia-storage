@@ -1,10 +1,16 @@
 import cron, { type ScheduledTask } from 'node-cron';
+import { sql } from 'drizzle-orm';
+import { db } from '@/lib/db';
 import { getConfig } from '@/lib/config/loader';
 import { runIncrementalBackup } from './s3';
 import { runNasBackup } from './nas';
+import { backupDatabaseToS3 } from './database';
 
 let scheduledTask: ScheduledTask | null = null;
-let isRunning = false;
+
+// Advisory-lock key for the backup job. Shared across processes that connect
+// to the same database, so two containers running the same cron won't race.
+const BACKUP_LOCK_KEY = 9731428461;
 
 /**
  * Start the backup scheduler using the cron expression from config.
@@ -35,44 +41,59 @@ export function startBackupScheduler(): void {
   console.info(`[backup] Avvio scheduler con cron: "${schedule}"`);
 
   scheduledTask = cron.schedule(schedule, async () => {
-    if (isRunning) {
-      console.warn('[backup] Backup già in corso, salto questa esecuzione.');
-      return;
-    }
-
-    isRunning = true;
-    console.info('[backup] Inizio backup programmato...');
-
+    // pg_try_advisory_xact_lock auto-releases at transaction end, guarding
+    // against concurrent runs across containers/processes. Returns false if
+    // another worker already holds the lock.
     try {
-      // Run S3 backup if configured
-      const hasS3 = config.backup.destinations.some((d) => d.type === 's3');
-      if (hasS3) {
-        console.info('[backup] Esecuzione backup S3...');
-        const s3Result = await runIncrementalBackup();
-        console.info(
-          `[backup] S3: ${s3Result.uploaded} file caricati, ${s3Result.errors.length} errori.`,
+      await db.transaction(async (tx) => {
+        const locked = await tx.execute<{ acquired: boolean }>(
+          sql`select pg_try_advisory_xact_lock(${BACKUP_LOCK_KEY}) as acquired`,
         );
-      }
+        const row = Array.isArray(locked) ? locked[0] : undefined;
+        if (!row?.acquired) {
+          console.warn('[backup] Backup già in corso su un altro worker, salto.');
+          return;
+        }
 
-      // Run NAS backup if configured
-      const hasNas = config.backup.destinations.some(
-        (d) => d.type === 'local' || d.type === 'smb',
-      );
-      if (hasNas) {
-        console.info('[backup] Esecuzione backup NAS...');
-        const nasResult = await runNasBackup();
-        console.info(
-          `[backup] NAS: ${nasResult.copied} file copiati, ${nasResult.errors.length} errori.`,
+        console.info('[backup] Inizio backup programmato...');
+
+        const hasS3 = config.backup.destinations.some((d) => d.type === 's3');
+        if (hasS3) {
+          console.info('[backup] Esecuzione backup S3...');
+          const s3Result = await runIncrementalBackup();
+          console.info(
+            `[backup] S3: ${s3Result.uploaded} file caricati, ${s3Result.errors.length} errori.`,
+          );
+
+          try {
+            const dbKey = await backupDatabaseToS3();
+            console.info(`[backup] Dump DB caricato su S3: ${dbKey}`);
+          } catch (dbErr) {
+            console.error(
+              '[backup] Dump DB fallito:',
+              dbErr instanceof Error ? dbErr.message : dbErr,
+            );
+          }
+        }
+
+        const hasNas = config.backup.destinations.some(
+          (d) => d.type === 'local' || d.type === 'smb',
         );
-      }
+        if (hasNas) {
+          console.info('[backup] Esecuzione backup NAS...');
+          const nasResult = await runNasBackup();
+          console.info(
+            `[backup] NAS: ${nasResult.copied} file copiati, ${nasResult.errors.length} errori.`,
+          );
+        }
+
+        console.info('[backup] Backup programmato completato.');
+      });
     } catch (err) {
       console.error(
         '[backup] Errore durante il backup:',
         err instanceof Error ? err.message : err,
       );
-    } finally {
-      isRunning = false;
-      console.info('[backup] Backup programmato completato.');
     }
   });
 
@@ -89,7 +110,6 @@ export function stopBackupScheduler(): void {
 
   scheduledTask.stop();
   scheduledTask = null;
-  isRunning = false;
   console.info('[backup] Scheduler fermato.');
 }
 

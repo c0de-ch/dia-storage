@@ -1,12 +1,15 @@
 import {
   S3Client,
   HeadBucketCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
   type S3ClientConfig,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
-import { createReadStream } from 'node:fs';
+import { createReadStream, createWriteStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { basename } from 'node:path';
+import { pipeline } from 'node:stream/promises';
+import type { Readable } from 'node:stream';
 import { eq, and, inArray } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
@@ -51,7 +54,7 @@ export function createS3Client(config: S3Config): S3Client {
  * Resolve the S3 config from the app configuration.
  * Looks for a backup destination of type "s3" in the backup.destinations array.
  */
-function getS3ConfigFromApp(): S3Config | null {
+export function getS3ConfigFromApp(): S3Config | null {
   const config = getConfig();
   const dest = config.backup.destinations.find((d) => d.type === 's3');
   if (
@@ -133,6 +136,77 @@ export async function uploadToS3(
   });
 
   await upload.done();
+}
+
+// ---------------------------------------------------------------------------
+// Download / List (restore path)
+// ---------------------------------------------------------------------------
+
+/**
+ * Download an S3 object to a local file path.
+ */
+export async function downloadFromS3(
+  key: string,
+  destPath: string,
+  config?: S3Config,
+): Promise<void> {
+  const s3Config = config ?? getS3ConfigFromApp();
+  if (!s3Config) {
+    throw new Error('Configurazione S3 non trovata.');
+  }
+
+  const client = createS3Client(s3Config);
+  const response = await client.send(
+    new GetObjectCommand({ Bucket: s3Config.bucket, Key: key }),
+  );
+
+  if (!response.Body) {
+    throw new Error(`Oggetto S3 vuoto: ${key}`);
+  }
+
+  await pipeline(response.Body as Readable, createWriteStream(destPath));
+}
+
+/**
+ * List S3 object keys under a given prefix, sorted by LastModified (newest first).
+ */
+export async function listS3Keys(
+  prefix: string,
+  config?: S3Config,
+): Promise<Array<{ key: string; size: number; lastModified: Date }>> {
+  const s3Config = config ?? getS3ConfigFromApp();
+  if (!s3Config) {
+    throw new Error('Configurazione S3 non trovata.');
+  }
+
+  const client = createS3Client(s3Config);
+  const results: Array<{ key: string; size: number; lastModified: Date }> = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const response = await client.send(
+      new ListObjectsV2Command({
+        Bucket: s3Config.bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      }),
+    );
+
+    for (const obj of response.Contents ?? []) {
+      if (obj.Key && obj.LastModified) {
+        results.push({
+          key: obj.Key,
+          size: obj.Size ?? 0,
+          lastModified: obj.LastModified,
+        });
+      }
+    }
+
+    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  results.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+  return results;
 }
 
 // ---------------------------------------------------------------------------
