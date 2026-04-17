@@ -31,6 +31,11 @@ vi.mock("@/lib/backup/database", () => ({
   backupDatabaseToS3: (...args: unknown[]) => mockBackupDatabaseToS3(...args),
 }));
 
+const mockPurgeOldAuditLogs = vi.fn();
+vi.mock("@/lib/audit/retention", () => ({
+  purgeOldAuditLogs: (...args: unknown[]) => mockPurgeOldAuditLogs(...args),
+}));
+
 const mockGetConfig = vi.fn();
 vi.mock("@/lib/config/loader", () => ({
   getConfig: () => mockGetConfig(),
@@ -65,12 +70,14 @@ function makeConfig(overrides?: {
   enabled?: boolean;
   schedule?: string;
   destinations?: Array<{ type: string }>;
+  auditRetainDays?: number;
 }) {
   return {
     backup: {
       enabled: overrides?.enabled ?? true,
       schedule: overrides?.schedule ?? "0 2 * * *",
       destinations: overrides?.destinations ?? [{ type: "s3" }],
+      auditRetainDays: overrides?.auditRetainDays ?? 365,
     },
   };
 }
@@ -213,6 +220,7 @@ describe("scheduled task callback", () => {
     mockRunIncrementalBackup.mockResolvedValue({ uploaded: 1, errors: [] });
     mockRunNasBackup.mockResolvedValue({ copied: 1, errors: [] });
     mockBackupDatabaseToS3.mockResolvedValue("db-backups/test.dump");
+    mockPurgeOldAuditLogs.mockResolvedValue(0);
   });
 
   it("runs S3 backup when s3 destination is configured", async () => {

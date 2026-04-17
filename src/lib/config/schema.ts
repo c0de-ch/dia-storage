@@ -28,29 +28,48 @@ const authSchema = z.object({
 // Email (SMTP)
 // ---------------------------------------------------------------------------
 const emailSchema = z.object({
-  host: z.string().default("localhost"),
-  port: z.number().int().default(587),
+  host: z.string().min(1, "email.host cannot be empty").default("localhost"),
+  port: z.number().int().min(1).max(65535).default(587),
   secure: z.boolean().default(false),
   user: z.string().optional(),
   password: z.string().optional(),
   from: z.string().email().default("noreply@localhost"),
-  fromName: z.string().default("Dia-Storage"),
+  fromName: z.string().min(1).default("Dia-Storage"),
 });
 
 // ---------------------------------------------------------------------------
 // WhatsApp
 // ---------------------------------------------------------------------------
-const whatsappSchema = z.object({
-  enabled: z.boolean().default(false),
-  apiUrl: z
-    .string()
-    .url()
-    .default("https://graph.facebook.com/v21.0"),
-  phoneNumberId: z.string().optional(),
-  accessToken: z.string().optional(),
-  templateName: z.string().default("otp_login"),
-  templateLanguage: z.string().default("it"),
-});
+const whatsappSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    apiUrl: z
+      .string()
+      .url()
+      .default("https://graph.facebook.com/v21.0"),
+    phoneNumberId: z.string().optional(),
+    accessToken: z.string().optional(),
+    templateName: z.string().min(1).default("otp_login"),
+    templateLanguage: z.string().min(1).default("it"),
+  })
+  .superRefine((data, ctx) => {
+    if (data.enabled) {
+      if (!data.phoneNumberId) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["phoneNumberId"],
+          message: "whatsapp.phoneNumberId is required when whatsapp.enabled is true",
+        });
+      }
+      if (!data.accessToken) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["accessToken"],
+          message: "whatsapp.accessToken is required when whatsapp.enabled is true",
+        });
+      }
+    }
+  });
 
 // ---------------------------------------------------------------------------
 // Storage
@@ -83,25 +102,41 @@ const databaseSchema = z.object({
 // ---------------------------------------------------------------------------
 // Backup
 // ---------------------------------------------------------------------------
-const backupDestinationSchema = z.object({
-  type: z.enum(["s3", "local", "smb", "rsync"]),
-  path: z.string().optional(),
-  bucket: z.string().optional(),
-  region: z.string().optional(),
-  endpoint: z.string().optional(),
-  accessKeyId: z.string().optional(),
-  secretAccessKey: z.string().optional(),
-  host: z.string().optional(),
-  share: z.string().optional(),
-  username: z.string().optional(),
-  password: z.string().optional(),
-});
+const backupDestinationSchema = z
+  .object({
+    type: z.enum(["s3", "local", "smb", "rsync"]),
+    path: z.string().optional(),
+    bucket: z.string().optional(),
+    region: z.string().optional(),
+    endpoint: z.string().optional(),
+    accessKeyId: z.string().optional(),
+    secretAccessKey: z.string().optional(),
+    host: z.string().optional(),
+    share: z.string().optional(),
+    username: z.string().optional(),
+    password: z.string().optional(),
+  })
+  .superRefine((d, ctx) => {
+    if (d.type === "s3" && !d.bucket) {
+      ctx.addIssue({ code: "custom", path: ["bucket"], message: "bucket is required for s3 destinations" });
+    }
+    if (d.type === "local" && !d.path) {
+      ctx.addIssue({ code: "custom", path: ["path"], message: "path is required for local destinations" });
+    }
+    if (d.type === "smb" && (!d.host || !d.share)) {
+      ctx.addIssue({ code: "custom", path: ["host"], message: "host and share are required for smb destinations" });
+    }
+    if (d.type === "rsync" && (!d.host || !d.path)) {
+      ctx.addIssue({ code: "custom", path: ["host"], message: "host and path are required for rsync destinations" });
+    }
+  });
 
 const backupSchema = z.object({
   enabled: z.boolean().default(false),
-  schedule: z.string().default("0 2 * * *"),
+  schedule: z.string().min(1).default("0 2 * * *"),
   destinations: z.array(backupDestinationSchema).default([]),
-  retainDays: z.number().int().default(90),
+  retainDays: z.number().int().min(1).default(90),
+  auditRetainDays: z.number().int().min(1).default(365),
   includeDatabase: z.boolean().default(true),
 });
 

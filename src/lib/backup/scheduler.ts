@@ -5,6 +5,8 @@ import { getConfig } from '@/lib/config/loader';
 import { runIncrementalBackup } from './s3';
 import { runNasBackup } from './nas';
 import { backupDatabaseToS3 } from './database';
+import { purgeOldAuditLogs } from '@/lib/audit/retention';
+import { reportError } from '@/lib/observability/report';
 
 let scheduledTask: ScheduledTask | null = null;
 
@@ -69,10 +71,7 @@ export function startBackupScheduler(): void {
             const dbKey = await backupDatabaseToS3();
             console.info(`[backup] Dump DB caricato su S3: ${dbKey}`);
           } catch (dbErr) {
-            console.error(
-              '[backup] Dump DB fallito:',
-              dbErr instanceof Error ? dbErr.message : dbErr,
-            );
+            reportError('backup.database', dbErr, { stage: 's3-dump' });
           }
         }
 
@@ -87,13 +86,21 @@ export function startBackupScheduler(): void {
           );
         }
 
+        try {
+          const purged = await purgeOldAuditLogs(config.backup.auditRetainDays);
+          if (purged > 0) {
+            console.info(`[backup] Retention audit log: rimosse ${purged} righe.`);
+          }
+        } catch (retentionErr) {
+          reportError('backup.auditRetention', retentionErr, {
+            retainDays: config.backup.auditRetainDays,
+          });
+        }
+
         console.info('[backup] Backup programmato completato.');
       });
     } catch (err) {
-      console.error(
-        '[backup] Errore durante il backup:',
-        err instanceof Error ? err.message : err,
-      );
+      reportError('backup.scheduler', err);
     }
   });
 
