@@ -4,6 +4,12 @@ import * as schema from '@/lib/db/schema';
 import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
 import { sendOtpEmail } from '@/lib/email/transport';
+import { createOtpCode } from '@/lib/auth/otp';
+import {
+  checkAuthRateLimit,
+  clientIp,
+  recordAuthAttempt,
+} from '@/lib/auth/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +23,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const ipAddress = clientIp(request.headers);
+
+    const rate = await checkAuthRateLimit(email, 'login');
+    if (!rate.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Troppi tentativi. Riprova più tardi.',
+          retryAfterSeconds: rate.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: rate.retryAfterSeconds
+            ? { 'Retry-After': String(rate.retryAfterSeconds) }
+            : undefined,
+        }
+      );
+    }
+
     const [user] = await db
       .select()
       .from(schema.users)
@@ -24,6 +49,8 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (!user) {
+      // Record the attempt so unknown-email probes are also rate-limited.
+      await recordAuthAttempt(email, 'login', false, ipAddress);
       return NextResponse.json(
         { success: false, message: 'Utente non trovato.' },
         { status: 404 }
@@ -31,21 +58,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user.active) {
+      await recordAuthAttempt(email, 'login', false, ipAddress);
       return NextResponse.json(
         { success: false, message: 'Account disattivato. Contattare un amministratore.' },
         { status: 403 }
       );
     }
 
-    const code = process.env.NODE_ENV === 'development' ? '000000' : Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    await db.insert(schema.otpCodes).values({
-      email: user.email,
-      code,
-      channel: user.otpChannel,
-      expiresAt,
-    });
+    const code = await createOtpCode(user.email, user.otpChannel);
+    await recordAuthAttempt(user.email, 'login', true, ipAddress);
 
     const host = request.headers.get('host') ?? new URL(request.url).host;
     const proto = request.headers.get('x-forwarded-proto') ?? 'http';

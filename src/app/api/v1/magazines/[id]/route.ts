@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { canEditMagazine, canDeleteMagazine } from '@/lib/auth/permissions';
 import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
 
@@ -63,6 +64,14 @@ export const PATCH = withAuth(async (request: NextRequest, context) => {
       );
     }
 
+    const user = (request as AuthenticatedRequest).user;
+    if (!canEditMagazine(user, existing.ownerUserId ?? undefined)) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per modificare questo caricatore.' },
+        { status: 403 }
+      );
+    }
+
     const updateData: Record<string, unknown> = {};
     if (body.name !== undefined) updateData.name = body.name;
     if (body.description !== undefined) updateData.description = body.description;
@@ -102,6 +111,14 @@ export const DELETE = withAuth(async (request: NextRequest, context) => {
       return NextResponse.json(
         { success: false, message: 'Caricatore non trovato.' },
         { status: 404 }
+      );
+    }
+
+    const user = (request as AuthenticatedRequest).user;
+    if (!canDeleteMagazine(user, existing.ownerUserId ?? undefined)) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per eliminare questo caricatore.' },
+        { status: 403 }
       );
     }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getSessionFromCookies } from "./session";
+import { hashApiKey } from "./api-key";
 import { db } from "@/lib/db";
 import { apiKeys, users } from "@/lib/db/schema";
 import { t } from "@/lib/i18n";
@@ -81,6 +82,8 @@ export function withApiKey(handler: AuthenticatedHandler): RouteHandler {
       );
     }
 
+    const hashedKey = hashApiKey(key);
+
     const rows = await db
       .select({
         apiKey: apiKeys,
@@ -88,7 +91,7 @@ export function withApiKey(handler: AuthenticatedHandler): RouteHandler {
       })
       .from(apiKeys)
       .innerJoin(users, eq(apiKeys.userId, users.id))
-      .where(eq(apiKeys.key, key))
+      .where(eq(apiKeys.key, hashedKey))
       .limit(1);
 
     if (rows.length === 0) {

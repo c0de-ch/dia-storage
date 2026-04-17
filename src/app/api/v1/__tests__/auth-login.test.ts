@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 vi.mock("@/lib/db/schema", () => ({
   users: { email: "users.email" },
   otpCodes: {},
+  authAttempts: {},
 }));
 
 vi.mock("@/lib/i18n", () => ({ t: vi.fn((k: string) => k) }));
@@ -13,8 +14,19 @@ vi.mock("@/lib/email/transport", () => ({
   sendOtpEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("@/lib/auth/otp", () => ({
+  createOtpCode: vi.fn().mockResolvedValue("123456"),
+}));
+
+vi.mock("@/lib/auth/rate-limit", () => ({
+  checkAuthRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+  recordAuthAttempt: vi.fn().mockResolvedValue(undefined),
+  clientIp: vi.fn().mockReturnValue(null),
+}));
+
 import { POST } from "@/app/api/v1/auth/login/route";
 import { sendOtpEmail } from "@/lib/email/transport";
+import { checkAuthRateLimit } from "@/lib/auth/rate-limit";
 
 function makeRequest(body: unknown) {
   return new NextRequest("http://localhost:3000/api/v1/auth/login", {
@@ -79,6 +91,19 @@ describe("POST /api/v1/auth/login", () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(sendOtpEmail).toHaveBeenCalled();
+  });
+
+  it("returns 429 when rate limit is exceeded", async () => {
+    vi.mocked(checkAuthRateLimit).mockResolvedValueOnce({
+      allowed: false,
+      retryAfterSeconds: 60,
+    });
+
+    const response = await POST(makeRequest({ email: "test@example.com" }));
+    expect(response.status).toBe(429);
+    const body = await response.json();
+    expect(body.retryAfterSeconds).toBe(60);
+    expect(response.headers.get("Retry-After")).toBe("60");
   });
 
   it("returns 500 when email sending fails", async () => {

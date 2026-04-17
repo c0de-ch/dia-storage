@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { canEditSlide, canDeleteSlide } from '@/lib/auth/permissions';
 import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
 
@@ -55,6 +56,14 @@ export const PATCH = withAuth(async (request: NextRequest, context) => {
       );
     }
 
+    const user = (request as AuthenticatedRequest).user;
+    if (!canEditSlide(user, existingSlide.uploadedBy ?? undefined)) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per modificare questa diapositiva.' },
+        { status: 403 }
+      );
+    }
+
     const allowedFields = [
       'title', 'dateTaken', 'location',
       'magazineId', 'slotNumber', 'notes', 'status',
@@ -102,6 +111,14 @@ export const DELETE = withAuth(async (request: NextRequest, context) => {
       return NextResponse.json(
         { success: false, message: 'Diapositiva non trovata.' },
         { status: 404 }
+      );
+    }
+
+    const user = (request as AuthenticatedRequest).user;
+    if (!canDeleteSlide(user, existingSlide.uploadedBy ?? undefined)) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per eliminare questa diapositiva.' },
+        { status: 403 }
       );
     }
 

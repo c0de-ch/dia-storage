@@ -4,6 +4,11 @@ import * as schema from '@/lib/db/schema';
 import { eq, and, gt, isNull } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { cookies } from 'next/headers';
+import {
+  checkAuthRateLimit,
+  clientIp,
+  recordAuthAttempt,
+} from '@/lib/auth/rate-limit';
 
 function getOrigin(request: NextRequest): string {
   const host = request.headers.get('host') ?? new URL(request.url).host;
@@ -23,6 +28,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${origin}/accesso?error=invalid`);
     }
 
+    const ipAddress = clientIp(request.headers);
+
+    const rate = await checkAuthRateLimit(email, 'verify');
+    if (!rate.allowed) {
+      return NextResponse.redirect(`${origin}/accesso?error=ratelimit`);
+    }
+
     const [user] = await db
       .select()
       .from(schema.users)
@@ -30,6 +42,7 @@ export async function GET(request: NextRequest) {
       .limit(1);
 
     if (!user) {
+      await recordAuthAttempt(email, 'verify', false, ipAddress);
       return NextResponse.redirect(`${origin}/accesso?error=user`);
     }
 
@@ -47,6 +60,7 @@ export async function GET(request: NextRequest) {
       .limit(1);
 
     if (!otpRecord) {
+      await recordAuthAttempt(email, 'verify', false, ipAddress);
       return NextResponse.redirect(`${origin}/accesso?error=expired`);
     }
 
@@ -55,6 +69,8 @@ export async function GET(request: NextRequest) {
       .update(schema.otpCodes)
       .set({ usedAt: new Date() })
       .where(eq(schema.otpCodes.id, otpRecord.id));
+
+    await recordAuthAttempt(email, 'verify', true, ipAddress);
 
     // Create session
     const sessionToken = nanoid(64);

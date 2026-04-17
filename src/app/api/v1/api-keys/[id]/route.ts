@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { canManageApiKeys } from '@/lib/auth/permissions';
 import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
 
@@ -20,6 +21,14 @@ export const DELETE = withAuth(async (request: NextRequest, context) => {
       return NextResponse.json(
         { success: false, message: 'Chiave API non trovata.' },
         { status: 404 }
+      );
+    }
+
+    const user = (request as AuthenticatedRequest).user;
+    if (!canManageApiKeys(user, existingKey.userId)) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per revocare questa chiave API.' },
+        { status: 403 }
       );
     }
 

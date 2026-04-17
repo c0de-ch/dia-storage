@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { getConfig } from '@/lib/config/loader';
 import { t } from '@/lib/i18n';
 import { nanoid } from 'nanoid';
 import sharp from 'sharp';
@@ -30,6 +31,7 @@ export const POST = withAuth(async (request: NextRequest) => {
 
     const batchId = nanoid();
     const results = [];
+    const maxBytes = getConfig().storage.maxUploadSizeMb * 1024 * 1024;
 
     for (const file of files) {
       const imageExts = ['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.webp', '.gif', '.heic', '.heif', '.bmp', '.avif'];
@@ -43,6 +45,15 @@ export const POST = withAuth(async (request: NextRequest) => {
           filename: file.name,
           success: false,
           message: `Tipo di file non supportato: ${file.name}`,
+        });
+        continue;
+      }
+
+      if (file.size > maxBytes) {
+        results.push({
+          filename: file.name,
+          success: false,
+          message: `File troppo grande: ${file.name} (max ${getConfig().storage.maxUploadSizeMb} MB).`,
         });
         continue;
       }

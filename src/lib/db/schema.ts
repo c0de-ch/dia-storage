@@ -396,3 +396,27 @@ export const auditLogRelations = relations(auditLog, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+// ---------------------------------------------------------------------------
+// Auth Attempts (rate limiting for login + verify-otp)
+// ---------------------------------------------------------------------------
+export const authAttempts = pgTable(
+  "auth_attempts",
+  {
+    id: serial("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    kind: text("kind").notNull(),
+    success: boolean("success").notNull().default(false),
+    ipAddress: text("ip_address"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("auth_attempts_identifier_idx").on(
+      table.identifier,
+      table.kind,
+      table.createdAt
+    ),
+  ]
+);

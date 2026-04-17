@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { canEditCollection, canDeleteCollection } from '@/lib/auth/permissions';
 import { t } from '@/lib/i18n';
 import { eq, inArray } from 'drizzle-orm';
 
@@ -73,6 +74,14 @@ export const PATCH = withAuth(async (request: NextRequest, context) => {
       );
     }
 
+    const user = (request as AuthenticatedRequest).user;
+    if (!canEditCollection(user, existing.ownerUserId ?? undefined)) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per modificare questa collezione.' },
+        { status: 403 }
+      );
+    }
+
     const updateData: Record<string, unknown> = {};
     if (body.name !== undefined) updateData.name = body.name;
     if (body.description !== undefined) updateData.description = body.description;
@@ -112,6 +121,14 @@ export const DELETE = withAuth(async (request: NextRequest, context) => {
       return NextResponse.json(
         { success: false, message: 'Collezione non trovata.' },
         { status: 404 }
+      );
+    }
+
+    const user = (request as AuthenticatedRequest).user;
+    if (!canDeleteCollection(user, existing.ownerUserId ?? undefined)) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per eliminare questa collezione.' },
+        { status: 403 }
       );
     }
 

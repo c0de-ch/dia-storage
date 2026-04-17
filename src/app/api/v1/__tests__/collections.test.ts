@@ -158,8 +158,8 @@ describe("PATCH /api/v1/collections/[id]", () => {
   });
 
   it("updates collection name", async () => {
-    const existing = { id: 1, name: "Old Name" };
-    const updated = { id: 1, name: "New Name" };
+    const existing = { id: 1, name: "Old Name", ownerUserId: 1 };
+    const updated = { id: 1, name: "New Name", ownerUserId: 1 };
 
     const mockLimit = vi.fn().mockResolvedValue([existing]);
     const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
@@ -183,6 +183,26 @@ describe("PATCH /api/v1/collections/[id]", () => {
     expect(response.status).toBe(200);
     expect(body.collection.name).toBe("New Name");
   });
+
+  it("returns 403 when user does not own the collection and is not admin", async () => {
+    const existing = { id: 1, name: "Other's", ownerUserId: 999 };
+
+    const mockLimit = vi.fn().mockResolvedValue([existing]);
+    const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
+    vi.mocked(db.select).mockReturnValue({ from: vi.fn().mockReturnValue({ where: mockWhere }) } as never);
+
+    const response = await PATCH(
+      new NextRequest("http://localhost:3000/api/v1/collections/1", {
+        method: "PATCH",
+        body: JSON.stringify({ name: "Hacked" }),
+        headers: { "content-type": "application/json" },
+      }),
+      makeContext("1"),
+    );
+
+    expect(response.status).toBe(403);
+    expect(db.update).not.toHaveBeenCalled();
+  });
 });
 
 describe("DELETE /api/v1/collections/[id]", () => {
@@ -204,7 +224,7 @@ describe("DELETE /api/v1/collections/[id]", () => {
   });
 
   it("deletes collection and its slide associations", async () => {
-    const existing = { id: 1, name: "Test" };
+    const existing = { id: 1, name: "Test", ownerUserId: 1 };
     const mockLimit = vi.fn().mockResolvedValue([existing]);
     const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
     vi.mocked(db.select).mockReturnValue({ from: vi.fn().mockReturnValue({ where: mockWhere }) } as never);

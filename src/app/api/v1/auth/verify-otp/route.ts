@@ -5,6 +5,11 @@ import { t } from '@/lib/i18n';
 import { eq, and, gt, isNull } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { cookies } from 'next/headers';
+import {
+  checkAuthRateLimit,
+  clientIp,
+  recordAuthAttempt,
+} from '@/lib/auth/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +23,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const ipAddress = clientIp(request.headers);
+
+    const rate = await checkAuthRateLimit(email, 'verify');
+    if (!rate.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Troppi tentativi. Riprova più tardi.',
+          retryAfterSeconds: rate.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: rate.retryAfterSeconds
+            ? { 'Retry-After': String(rate.retryAfterSeconds) }
+            : undefined,
+        }
+      );
+    }
+
     const [user] = await db
       .select()
       .from(schema.users)
@@ -25,6 +49,7 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (!user) {
+      await recordAuthAttempt(email, 'verify', false, ipAddress);
       return NextResponse.json(
         { success: false, message: 'Utente non trovato.' },
         { status: 404 }
@@ -45,6 +70,7 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (!otpRecord) {
+      await recordAuthAttempt(email, 'verify', false, ipAddress);
       return NextResponse.json(
         { success: false, message: 'Codice OTP non valido o scaduto.' },
         { status: 401 }
@@ -55,6 +81,8 @@ export async function POST(request: NextRequest) {
       .update(schema.otpCodes)
       .set({ usedAt: new Date() })
       .where(eq(schema.otpCodes.id, otpRecord.id));
+
+    await recordAuthAttempt(email, 'verify', true, ipAddress);
 
     const sessionToken = nanoid(64);
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days

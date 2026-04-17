@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, withAdmin, AuthenticatedRequest } from '@/lib/auth/middleware';
+import { generateApiKey, hashApiKey } from '@/lib/auth/api-key';
 import { t } from '@/lib/i18n';
 import { eq } from 'drizzle-orm';
-import crypto from 'crypto';
 
 export const GET = withAdmin(async (request: NextRequest) => {
   try {
@@ -43,8 +43,8 @@ export const POST = withAuth(async (request: NextRequest) => {
       );
     }
 
-    const rawKey = `dia_${crypto.randomBytes(32).toString('hex')}`;
-    const hashedKey = crypto.createHash('sha256').update(rawKey).digest('hex');
+    const rawKey = generateApiKey();
+    const hashedKey = hashApiKey(rawKey);
 
     const [apiKey] = await db
       .insert(schema.apiKeys)

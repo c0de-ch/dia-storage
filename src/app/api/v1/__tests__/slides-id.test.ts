@@ -89,8 +89,8 @@ describe("PATCH /api/v1/slides/[id]", () => {
   });
 
   it("updates slide fields and returns updated slide", async () => {
-    const existingSlide = { id: 1, title: "Old Title", status: "active" };
-    const updatedSlide = { id: 1, title: "New Title", status: "active" };
+    const existingSlide = { id: 1, title: "Old Title", status: "active", uploadedBy: 1 };
+    const updatedSlide = { id: 1, title: "New Title", status: "active", uploadedBy: 1 };
 
     const mockLimit = vi.fn().mockResolvedValue([existingSlide]);
     const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
@@ -115,6 +115,26 @@ describe("PATCH /api/v1/slides/[id]", () => {
     expect(body.success).toBe(true);
     expect(body.slide.title).toBe("New Title");
   });
+
+  it("returns 403 when user does not own the slide and is not admin", async () => {
+    const existingSlide = { id: 1, title: "Old", status: "active", uploadedBy: 999 };
+
+    const mockLimit = vi.fn().mockResolvedValue([existingSlide]);
+    const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
+    vi.mocked(db.select).mockReturnValue({ from: vi.fn().mockReturnValue({ where: mockWhere }) } as never);
+
+    const response = await PATCH(
+      new NextRequest("http://localhost:3000/api/v1/slides/1", {
+        method: "PATCH",
+        body: JSON.stringify({ title: "Hacked" }),
+        headers: { "content-type": "application/json" },
+      }),
+      makeContext("1"),
+    );
+
+    expect(response.status).toBe(403);
+    expect(db.update).not.toHaveBeenCalled();
+  });
 });
 
 describe("DELETE /api/v1/slides/[id]", () => {
@@ -136,7 +156,7 @@ describe("DELETE /api/v1/slides/[id]", () => {
   });
 
   it("soft-deletes the slide by setting status to deleted", async () => {
-    const slide = { id: 1, title: "PICT0001", status: "active" };
+    const slide = { id: 1, title: "PICT0001", status: "active", uploadedBy: 1 };
     const mockLimit = vi.fn().mockResolvedValue([slide]);
     const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
     vi.mocked(db.select).mockReturnValue({ from: vi.fn().mockReturnValue({ where: mockWhere }) } as never);

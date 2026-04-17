@@ -13,6 +13,10 @@ function getTransport(): Transporter {
 
   const config = getConfig();
 
+  // Opt-in escape hatch for dev SMTP servers with self-signed certs.
+  // Default: full TLS cert validation.
+  const allowInsecure = process.env.DIA_ALLOW_INSECURE_TLS === "true";
+
   transporter = nodemailer.createTransport({
     host: config.email.host,
     port: config.email.port,
@@ -27,7 +31,7 @@ function getTransport(): Transporter {
         }
       : {}),
     tls: {
-      rejectUnauthorized: false,
+      rejectUnauthorized: !allowInsecure,
     },
   });
 
