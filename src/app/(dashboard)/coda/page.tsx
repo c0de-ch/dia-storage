@@ -256,7 +256,7 @@ function BatchCard({
             )}
             {t("queue.publishToGallery")}
           </Button>
-          <Button variant="outline" render={<a href={`/coda/${batch.id}`} />}>
+          <Button variant="outline" nativeButton={false} render={<a href={`/coda/${batch.id}`} />}>
             <PencilIcon />
             {t("queue.editIndividual")}
           </Button>

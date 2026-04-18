@@ -16,6 +16,7 @@ import {
   LogOutIcon,
   ChevronUpIcon,
   FileTextIcon,
+  PaletteIcon,
 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth/context";
@@ -82,6 +83,12 @@ const mainNavItems = [
     href: "/ricerca",
     icon: SearchIcon,
     helpKey: "navHelp.ricerca" as const,
+  },
+  {
+    label: t("nav.theme"),
+    href: "/tema",
+    icon: PaletteIcon,
+    helpKey: "navHelp.tema" as const,
   },
 ];
 
@@ -254,9 +261,7 @@ export function NavSidebar() {
                 align="end"
                 className="w-56"
               >
-                <DropdownMenuItem
-                  onSelect={() => logout()}
-                >
+                <DropdownMenuItem onClick={() => logout()}>
                   <LogOutIcon />
                   {t("nav.logout")}
                 </DropdownMenuItem>

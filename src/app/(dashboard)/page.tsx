@@ -147,7 +147,11 @@ export default function DashboardPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {t("empty.slidesDescription")}
               </p>
-              <Button className="mt-4" render={<Link href="/caricamento" />}>
+              <Button
+                className="mt-4"
+                nativeButton={false}
+                render={<Link href="/caricamento" />}
+              >
                 <UploadIcon />
                 Carica diapositive
               </Button>

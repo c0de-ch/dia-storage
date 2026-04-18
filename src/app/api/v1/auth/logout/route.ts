@@ -1,21 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import * as schema from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import {
+  clearSessionCookie,
+  deleteSession,
+  getSessionToken,
+} from '@/lib/auth/session';
 
 export async function POST(_request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get('session')?.value;
+    const token = await getSessionToken();
 
-    if (sessionToken) {
-      await db
-        .delete(schema.userSessions)
-        .where(eq(schema.userSessions.token, sessionToken));
-
-      cookieStore.delete('session');
+    if (token) {
+      await deleteSession(token);
     }
+
+    await clearSessionCookie();
 
     return NextResponse.json({
       success: true,

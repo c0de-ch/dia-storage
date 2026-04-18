@@ -16,6 +16,38 @@ export function getOtpEmailTemplate(code: string, magicLink?: string): EmailTemp
 
   const subject = `${appName} - Il tuo codice di accesso`;
 
+  // Render each digit in its own square, mirroring the InputOTP layout on /accesso.
+  // Tables + inline styles only, for broad email client support.
+  const digits = code.split("");
+  const slot = (digit: string | undefined) => `
+    <td align="center" valign="middle" width="52" height="60" style="
+      width: 52px; height: 60px;
+      border: 1px solid #e0d4c2;
+      border-radius: 8px;
+      background-color: #fffdf8;
+      font-family: 'Courier New', monospace;
+      font-size: 30px;
+      font-weight: 700;
+      color: #2a1d0e;
+      text-align: center;
+      vertical-align: middle;
+    ">${digit ?? ""}</td>`;
+  const spacer = `<td width="8" style="width: 8px;">&nbsp;</td>`;
+  const separator = `<td width="16" align="center" style="width: 16px; color: #b8a78c; font-weight: 700;">&ndash;</td>`;
+  const codeRow = [
+    slot(digits[0]),
+    spacer,
+    slot(digits[1]),
+    spacer,
+    slot(digits[2]),
+    separator,
+    slot(digits[3]),
+    spacer,
+    slot(digits[4]),
+    spacer,
+    slot(digits[5]),
+  ].join("");
+
   const html = `
 <!DOCTYPE html>
 <html lang="it">
@@ -43,14 +75,12 @@ export function getOtpEmailTemplate(code: string, magicLink?: string): EmailTemp
               <p style="margin: 0 0 16px; font-size: 16px; line-height: 1.5; color: #3f3f46;">
                 Ecco il tuo codice di accesso:
               </p>
-              <div style="text-align: center; padding: 20px 0;">
-                <span style="display: inline-block; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #18181b; background-color: #f4f4f5; padding: 16px 32px; border-radius: 8px; font-family: 'Courier New', monospace;">
-                  ${code}
-                </span>
-              </div>
+              <table role="presentation" align="center" style="margin: 20px auto; border-collapse: separate; border-spacing: 0;">
+                <tr>${codeRow}</tr>
+              </table>
               ${magicLink ? `
               <div style="text-align: center; padding: 16px 0 0;">
-                <a href="${magicLink}" style="display: inline-block; background-color: #18181b; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 8px;">
+                <a href="${magicLink}" style="display: inline-block; background-color: #c97a3a; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 8px;">
                   Accedi direttamente
                 </a>
               </div>

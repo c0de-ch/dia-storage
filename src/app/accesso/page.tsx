@@ -4,6 +4,12 @@ import React, { useState } from "react";
 import { t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -132,24 +138,30 @@ export default function AccessoPage() {
             </form>
           ) : (
             <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col items-center gap-2">
                 <Label htmlFor="otp">{t("auth.enterOtp")}</Label>
-                <Input
+                <InputOTP
                   id="otp"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
                   maxLength={6}
-                  placeholder={t("auth.otpPlaceholder")}
                   value={otp}
-                  onChange={(e) =>
-                    setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
-                  }
-                  required
-                  autoFocus
+                  onChange={(value) => setOtp(value.replace(/\D/g, ""))}
                   disabled={loading}
-                  className="text-center text-lg tracking-[0.5em]"
-                />
+                  autoFocus
+                  pattern="[0-9]*"
+                  inputMode="numeric"
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} className="size-14 text-2xl" />
+                    <InputOTPSlot index={1} className="size-14 text-2xl" />
+                    <InputOTPSlot index={2} className="size-14 text-2xl" />
+                  </InputOTPGroup>
+                  <InputOTPSeparator />
+                  <InputOTPGroup>
+                    <InputOTPSlot index={3} className="size-14 text-2xl" />
+                    <InputOTPSlot index={4} className="size-14 text-2xl" />
+                    <InputOTPSlot index={5} className="size-14 text-2xl" />
+                  </InputOTPGroup>
+                </InputOTP>
               </div>
               <Button type="submit" disabled={loading || otp.length !== 6}>
                 {loading && <Loader2Icon className="animate-spin" />}

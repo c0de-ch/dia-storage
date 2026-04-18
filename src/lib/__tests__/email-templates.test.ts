@@ -35,9 +35,20 @@ describe("getOtpEmailTemplate", () => {
   });
 
   describe("OTP code in output", () => {
-    it("includes the code in the HTML body", () => {
+    it("includes each digit of the code as its own slot in the HTML body", () => {
       const result = getOtpEmailTemplate("987654");
-      expect(result.html).toContain("987654");
+      // Code is rendered as 6 individual <td> slots (matching InputOTP layout
+      // on /accesso). Assert every digit appears inside such a slot.
+      for (const digit of "987654") {
+        expect(result.html).toMatch(
+          new RegExp(`<td[^>]*>\\s*${digit}\\s*</td>`)
+        );
+      }
+    });
+
+    it("renders a separator between the 3rd and 4th digit slots", () => {
+      const result = getOtpEmailTemplate("987654");
+      expect(result.html).toContain("&ndash;");
     });
 
     it("includes the code in the text body", () => {

@@ -588,7 +588,7 @@ export default function GalleriaPage() {
             <p className="text-sm text-muted-foreground">
               Organizza le diapositive in album tematici
             </p>
-            <Button size="sm" render={<Link href="/galleria?view=all" />} onClick={() => {
+            <Button size="sm" nativeButton={false} render={<Link href="/galleria?view=all" />} onClick={() => {
               // Create new collection inline
               const name = prompt("Nome del nuovo album:");
               if (!name) return;

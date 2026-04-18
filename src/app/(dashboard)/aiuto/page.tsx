@@ -163,11 +163,11 @@ export default function AiutoPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-3">
-            <Button render={<a href={DIA_UPLOADER_DOWNLOAD_URL} />}>
+            <Button nativeButton={false} render={<a href={DIA_UPLOADER_DOWNLOAD_URL} />}>
               <DownloadIcon className="size-4 mr-2" />
               Scarica Dia-Uploader
             </Button>
-            <Button variant="outline" render={<a href="dia-uploader://open" />}>
+            <Button variant="outline" nativeButton={false} render={<a href="dia-uploader://open" />}>
               <ExternalLinkIcon className="size-4 mr-2" />
               Apri Dia-Uploader
             </Button>

@@ -37,6 +37,7 @@ const translations = {
     profile: "Profilo",
     logout: "Esci",
     login: "Accedi",
+    theme: "Tema",
   },
 
   // ---------------------------------------------------------------------------
@@ -547,6 +548,8 @@ const translations = {
     themeLight: "Chiaro",
     themeDark: "Scuro",
     themeSystem: "Sistema",
+    themeVivid: "Vivido",
+    themeGlass: "Vetro",
     language: "Lingua",
   },
 
@@ -786,6 +789,8 @@ const translations = {
       "Il registro attività mostra la cronologia di tutte le azioni compiute dagli utenti nel sistema.",
     aiuto:
       "La sezione aiuto contiene la documentazione e le guide per utilizzare Dia-Storage.",
+    tema:
+      "Da qui puoi cambiare l'aspetto dell'applicazione: scegli tra tema chiaro, scuro, vivido, vetro o segui le impostazioni di sistema.",
   },
 
   // ---------------------------------------------------------------------------
