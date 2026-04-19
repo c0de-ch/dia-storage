@@ -84,12 +84,6 @@ const mainNavItems = [
     icon: SearchIcon,
     helpKey: "navHelp.ricerca" as const,
   },
-  {
-    label: t("nav.theme"),
-    href: "/tema",
-    icon: PaletteIcon,
-    helpKey: "navHelp.tema" as const,
-  },
 ];
 
 const adminNavItems = [
@@ -98,6 +92,12 @@ const adminNavItems = [
     href: "/admin/utenti",
     icon: UsersIcon,
     helpKey: "navHelp.utenti" as const,
+  },
+  {
+    label: t("nav.theme"),
+    href: "/tema",
+    icon: PaletteIcon,
+    helpKey: "navHelp.tema" as const,
   },
   {
     label: t("nav.backup"),
