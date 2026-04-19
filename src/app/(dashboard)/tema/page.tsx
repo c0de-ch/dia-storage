@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import {
   CheckIcon,
@@ -115,15 +115,20 @@ const themes: ThemeOption[] = [
   },
 ];
 
+const subscribeMount = () => () => {};
+const getMountedSnapshot = () => true;
+const getServerMountedSnapshot = () => false;
+
 export default function TemaPage() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  // next-themes returns `undefined` on first render (SSR). Wait for mount so
-  // the "Attivo" badge doesn't flash on the wrong card.
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // next-themes returns `undefined` on first render (SSR). useSyncExternalStore
+  // lets us return false on the server and true after hydration without a
+  // setState-in-effect, which the react-hooks rule now flags as an error.
+  const mounted = useSyncExternalStore(
+    subscribeMount,
+    getMountedSnapshot,
+    getServerMountedSnapshot,
+  );
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">

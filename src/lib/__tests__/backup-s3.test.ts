@@ -21,7 +21,28 @@ vi.mock("@aws-sdk/client-s3", () => {
       this.Bucket = params.Bucket;
     }
   }
-  return { S3Client: MockS3Client, HeadBucketCommand: MockHeadBucketCommand };
+  class MockGetObjectCommand {
+    params: { Bucket: string; Key: string };
+    constructor(params: { Bucket: string; Key: string }) {
+      this.params = params;
+    }
+  }
+  class MockListObjectsV2Command {
+    params: { Bucket: string; Prefix: string; ContinuationToken?: string };
+    constructor(params: {
+      Bucket: string;
+      Prefix: string;
+      ContinuationToken?: string;
+    }) {
+      this.params = params;
+    }
+  }
+  return {
+    S3Client: MockS3Client,
+    HeadBucketCommand: MockHeadBucketCommand,
+    GetObjectCommand: MockGetObjectCommand,
+    ListObjectsV2Command: MockListObjectsV2Command,
+  };
 });
 
 const mockUploadDone = vi.fn();
@@ -38,8 +59,15 @@ vi.mock("@aws-sdk/lib-storage", () => {
   return { Upload: MockUpload };
 });
 
+const mockWriteSink = { writable: true };
 vi.mock("node:fs", () => ({
   createReadStream: vi.fn(() => "mock-stream"),
+  createWriteStream: vi.fn(() => mockWriteSink),
+}));
+
+const pipelineMock = vi.fn(() => Promise.resolve());
+vi.mock("node:stream/promises", () => ({
+  pipeline: (...args: unknown[]) => pipelineMock(...args),
 }));
 
 vi.mock("node:fs/promises", () => ({
@@ -80,6 +108,9 @@ import {
   createS3Client,
   testS3Connection,
   uploadToS3,
+  downloadFromS3,
+  listS3Keys,
+  getS3ConfigFromApp,
   runIncrementalBackup,
   type S3Config,
 } from "@/lib/backup/s3";
@@ -323,5 +354,166 @@ describe("runIncrementalBackup", () => {
     const result = await runIncrementalBackup();
 
     expect(result.errors[0].error).toBe("string error");
+  });
+});
+
+describe("getS3ConfigFromApp", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns null when no s3 destination is configured", () => {
+    mockGetConfig.mockReturnValue(makeAppConfig({ destinations: [] }));
+    expect(getS3ConfigFromApp()).toBeNull();
+  });
+
+  it("returns null when the s3 destination is missing credentials", () => {
+    mockGetConfig.mockReturnValue(
+      makeAppConfig({
+        destinations: [
+          { type: "s3", endpoint: "https://s3.example.com", bucket: "b" },
+        ],
+      }),
+    );
+    expect(getS3ConfigFromApp()).toBeNull();
+  });
+
+  it("defaults region to us-east-1 when not provided", () => {
+    mockGetConfig.mockReturnValue(
+      makeAppConfig({
+        destinations: [
+          {
+            type: "s3",
+            endpoint: "https://s3.example.com",
+            bucket: "b",
+            accessKeyId: "k",
+            secretAccessKey: "s",
+          },
+        ],
+      }),
+    );
+    const cfg = getS3ConfigFromApp();
+    expect(cfg).toMatchObject({ region: "us-east-1", bucket: "b" });
+  });
+});
+
+describe("downloadFromS3", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    pipelineMock.mockResolvedValue(undefined);
+  });
+
+  it("streams the S3 object body into the destination write stream", async () => {
+    mockSend.mockResolvedValue({ Body: "mock-body" });
+
+    await downloadFromS3("some/key", "/tmp/out.dump", baseConfig);
+
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(pipelineMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to app config when no explicit config is provided", async () => {
+    mockGetConfig.mockReturnValue(makeAppConfig());
+    mockSend.mockResolvedValue({ Body: "mock-body" });
+
+    await downloadFromS3("some/key", "/tmp/out.dump");
+
+    expect(mockSend).toHaveBeenCalled();
+  });
+
+  it("throws when no S3 config is available", async () => {
+    mockGetConfig.mockReturnValue(makeAppConfig({ destinations: [] }));
+    await expect(downloadFromS3("k", "/tmp/x")).rejects.toThrow(
+      /Configurazione S3 non trovata/,
+    );
+  });
+
+  it("throws when the S3 object has an empty body", async () => {
+    mockSend.mockResolvedValue({ Body: null });
+    await expect(
+      downloadFromS3("some/key", "/tmp/out.dump", baseConfig),
+    ).rejects.toThrow(/Oggetto S3 vuoto/);
+  });
+});
+
+describe("listS3Keys", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns objects sorted by lastModified desc", async () => {
+    const older = new Date("2024-01-01T00:00:00Z");
+    const newer = new Date("2024-06-01T00:00:00Z");
+    mockSend.mockResolvedValueOnce({
+      Contents: [
+        { Key: "a.dump", Size: 100, LastModified: older },
+        { Key: "b.dump", Size: 200, LastModified: newer },
+      ],
+      IsTruncated: false,
+    });
+
+    const results = await listS3Keys("db-backups/", baseConfig);
+
+    expect(results.map((r) => r.key)).toEqual(["b.dump", "a.dump"]);
+    expect(results[0]).toMatchObject({ size: 200, lastModified: newer });
+  });
+
+  it("paginates through ContinuationToken-driven responses", async () => {
+    const d1 = new Date("2024-01-01T00:00:00Z");
+    const d2 = new Date("2024-02-01T00:00:00Z");
+    mockSend
+      .mockResolvedValueOnce({
+        Contents: [{ Key: "a", Size: 1, LastModified: d1 }],
+        IsTruncated: true,
+        NextContinuationToken: "tok1",
+      })
+      .mockResolvedValueOnce({
+        Contents: [{ Key: "b", Size: 2, LastModified: d2 }],
+        IsTruncated: false,
+      });
+
+    const results = await listS3Keys("prefix/", baseConfig);
+
+    expect(mockSend).toHaveBeenCalledTimes(2);
+    expect(results).toHaveLength(2);
+  });
+
+  it("skips entries with missing Key or LastModified", async () => {
+    mockSend.mockResolvedValueOnce({
+      Contents: [
+        { Key: undefined, Size: 1, LastModified: new Date() },
+        { Key: "ok", LastModified: undefined },
+        { Key: "good", Size: 10, LastModified: new Date("2024-03-01Z") },
+      ],
+      IsTruncated: false,
+    });
+
+    const results = await listS3Keys("p/", baseConfig);
+    expect(results.map((r) => r.key)).toEqual(["good"]);
+  });
+
+  it("treats missing Contents as empty", async () => {
+    mockSend.mockResolvedValueOnce({ IsTruncated: false });
+    const results = await listS3Keys("p/", baseConfig);
+    expect(results).toEqual([]);
+  });
+
+  it("defaults size to 0 when Size is missing", async () => {
+    mockSend.mockResolvedValueOnce({
+      Contents: [{ Key: "k", LastModified: new Date("2024-01-01Z") }],
+      IsTruncated: false,
+    });
+    const [first] = await listS3Keys("p/", baseConfig);
+    expect(first.size).toBe(0);
+  });
+
+  it("falls back to app config when no explicit config is provided", async () => {
+    mockGetConfig.mockReturnValue(makeAppConfig());
+    mockSend.mockResolvedValueOnce({ Contents: [], IsTruncated: false });
+    await listS3Keys("prefix/");
+    expect(mockSend).toHaveBeenCalled();
+  });
+
+  it("throws when no S3 config is available", async () => {
+    mockGetConfig.mockReturnValue(makeAppConfig({ destinations: [] }));
+    await expect(listS3Keys("prefix/")).rejects.toThrow(
+      /Configurazione S3 non trovata/,
+    );
   });
 });

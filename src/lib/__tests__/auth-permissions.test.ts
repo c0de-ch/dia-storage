@@ -239,6 +239,10 @@ describe("canDeleteMagazine", () => {
   it("non-owner user cannot delete", () => {
     expect(canDeleteMagazine(makeUser({ id: 3 }), 4)).toBe(false);
   });
+
+  it("inactive owner cannot delete their own magazine", () => {
+    expect(canDeleteMagazine(makeUser({ id: 3, active: false }), 3)).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -266,6 +270,10 @@ describe("canEditCollection", () => {
   it("non-owner cannot edit", () => {
     expect(canEditCollection(makeUser({ id: 4 }), 5)).toBe(false);
   });
+
+  it("inactive owner cannot edit their own collection", () => {
+    expect(canEditCollection(makeUser({ id: 4, active: false }), 4)).toBe(false);
+  });
 });
 
 describe("canDeleteCollection", () => {
@@ -279,6 +287,10 @@ describe("canDeleteCollection", () => {
 
   it("non-owner cannot delete", () => {
     expect(canDeleteCollection(makeUser({ id: 4 }), 5)).toBe(false);
+  });
+
+  it("inactive owner cannot delete their own collection", () => {
+    expect(canDeleteCollection(makeUser({ id: 4, active: false }), 4)).toBe(false);
   });
 });
 
