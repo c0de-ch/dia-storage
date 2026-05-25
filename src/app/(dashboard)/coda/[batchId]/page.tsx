@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LocationPicker } from "@/components/location-picker";
+import { ImageLightbox } from "@/components/image-lightbox";
 import {
   ArrowLeftIcon,
   RotateCcwIcon,
@@ -41,6 +42,7 @@ function SlideEditor({ slide }: { slide: Slide }) {
   const [saving, setSaving] = useState(false);
   const [version, setVersion] = useState(0);
   const [busyOp, setBusyOp] = useState<string | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   async function applyOp(op: string) {
     setBusyOp(op);
@@ -93,7 +95,8 @@ function SlideEditor({ slide }: { slide: Slide }) {
             <img
               src={`/api/v1/slides/${slide.id}/medium?v=${version}`}
               alt={slide.originalFilename ?? "Diapositiva"}
-              className="max-h-full max-w-full object-contain"
+              onClick={() => setLightboxOpen(true)}
+              className="max-h-full max-w-full cursor-zoom-in object-contain"
             />
           </div>
           <div className="flex flex-wrap items-center justify-center gap-1.5">
@@ -202,6 +205,13 @@ function SlideEditor({ slide }: { slide: Slide }) {
           </div>
         </div>
       </CardContent>
+      <ImageLightbox
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+        src={`/api/v1/slides/${slide.id}/medium?v=${version}`}
+        alt={slide.originalFilename}
+        downloadUrl={`/api/v1/slides/${slide.id}/original`}
+      />
     </Card>
   );
 }
