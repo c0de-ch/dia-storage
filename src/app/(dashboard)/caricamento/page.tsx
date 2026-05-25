@@ -2,6 +2,7 @@
 
 import React, { useCallback, useRef, useState } from "react";
 import Link from "next/link";
+import { nanoid } from "nanoid";
 import { t } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -42,8 +43,9 @@ export default function CaricamentoPage() {
   // burning bytes until it finished.
   const abortRef = useRef<AbortController | null>(null);
 
-  // Optional metadata
-  const [magazineName, setMagazineName] = useState("");
+  // Optional batch metadata — applied to every photo in this upload and used
+  // as the album name when the batch is published from the queue.
+  const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [location, setLocation] = useState("");
 
@@ -72,6 +74,9 @@ export default function CaricamentoPage() {
 
     const controller = new AbortController();
     abortRef.current = controller;
+    // One batch id for the whole upload session so all files land in a single
+    // queue batch (the route reuses it instead of minting one per file).
+    const batchId = nanoid();
     setUploadState("uploading");
 
     const statuses: FileUploadStatus[] = files.map((f) => ({
@@ -102,7 +107,8 @@ export default function CaricamentoPage() {
       try {
         const formData = new FormData();
         formData.append("file", file);
-        if (magazineName) formData.append("magazineName", magazineName);
+        formData.append("batchId", batchId);
+        if (title) formData.append("title", title);
         if (date) formData.append("date", date);
         if (location) formData.append("location", location);
 
@@ -166,14 +172,14 @@ export default function CaricamentoPage() {
         `Caricamento completato con ${errors} errori`
       );
     }
-  }, [files, magazineName, date, location]);
+  }, [files, title, date, location]);
 
   const handleReset = useCallback(() => {
     setFiles([]);
     setFileStatuses([]);
     setOverallProgress(0);
     setUploadState("idle");
-    setMagazineName("");
+    setTitle("");
     setDate("");
     setLocation("");
   }, []);
@@ -251,14 +257,14 @@ export default function CaricamentoPage() {
               <CardContent>
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="magazine-name">
-                      {t("metadata.magazine")}
+                    <Label htmlFor="batch-title">
+                      {t("metadata.title")}
                     </Label>
                     <Input
-                      id="magazine-name"
-                      placeholder={t("magazines.magazineNamePlaceholder")}
-                      value={magazineName}
-                      onChange={(e) => setMagazineName(e.target.value)}
+                      id="batch-title"
+                      placeholder="es. Vacanze estate 1985"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">

@@ -28,7 +28,17 @@ export const POST = withAuth(async (request: NextRequest) => {
       );
     }
 
-    const batchId = nanoid();
+    // Optional batch metadata, applied to every slide in this request. The
+    // client sends one batchId for the whole upload session so the files group
+    // into a single queue batch.
+    const providedBatchId = (formData.get('batchId') as string | null)?.trim();
+    const title = (formData.get('title') as string | null)?.trim() || null;
+    const dateRaw = (formData.get('date') as string | null)?.trim() || null;
+    const location = (formData.get('location') as string | null)?.trim() || null;
+    const dateTakenPrecise =
+      dateRaw && /^\d{4}-\d{2}-\d{2}$/.test(dateRaw) ? dateRaw : null;
+
+    const batchId = providedBatchId || nanoid();
     const results = [];
     const maxBytes = getConfig().storage.maxUploadSizeMb * 1024 * 1024;
 
@@ -135,6 +145,10 @@ export const POST = withAuth(async (request: NextRequest) => {
           width,
           height,
           checksum,
+          title,
+          dateTaken: dateRaw,
+          dateTakenPrecise,
+          location,
           status: 'incoming',
           uploadedBy: user.id,
         })
