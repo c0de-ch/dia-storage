@@ -1,14 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { InfoIcon, Volume2Icon, VolumeXIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { InfoIcon, VolumeXIcon } from "lucide-react";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { useSpeechSynthesis } from "@/hooks/use-speech-synthesis";
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface HelpPopoverProps {
   title?: string;
@@ -16,59 +14,111 @@ interface HelpPopoverProps {
 }
 
 /**
- * An "ⓘ" button that opens a popover explaining the actions available on the
- * current page, with an option to read the help aloud.
+ * An "ⓘ" affordance that explains the actions available on the current page.
+ * Hovering shows the tips; clicking reads them aloud. The speech behaviour
+ * mirrors the nav menu's voice help exactly (same inline implementation).
  */
 export function HelpPopover({ title = "Cosa puoi fare", items }: HelpPopoverProps) {
-  const [open, setOpen] = useState(false);
-  const { speak, cancel, isSpeaking, isSupported } = useSpeechSynthesis();
-  const spoken = `${title}. ${items.join(". ")}`;
+  const speakingRef = useRef(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [italianVoice, setItalianVoice] = useState<SpeechSynthesisVoice | null>(
+    null
+  );
+  const text = `${title}. ${items.join(". ")}`;
+
+  // Voices load asynchronously — listen for the event
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    function pickItalianVoice() {
+      const voices = window.speechSynthesis.getVoices();
+      // Prefer a female Italian voice for clarity, fall back to any Italian
+      const preferred = voices.find(
+        (v) =>
+          v.lang.startsWith("it") &&
+          /female|donna|google.*italian/i.test(v.name)
+      );
+      const fallback = voices.find((v) => v.lang.startsWith("it"));
+      setItalianVoice(preferred ?? fallback ?? null);
+    }
+
+    pickItalianVoice();
+    window.speechSynthesis.addEventListener("voiceschanged", pickItalianVoice);
+    return () => {
+      window.speechSynthesis.removeEventListener(
+        "voiceschanged",
+        pickItalianVoice
+      );
+    };
+  }, []);
+
+  const speak = useCallback(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    if (speakingRef.current) {
+      window.speechSynthesis.cancel();
+      speakingRef.current = false;
+      setIsSpeaking(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "it-IT";
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+
+    if (italianVoice) {
+      utterance.voice = italianVoice;
+    }
+
+    utterance.onstart = () => {
+      speakingRef.current = true;
+      setIsSpeaking(true);
+    };
+    utterance.onend = () => {
+      speakingRef.current = false;
+      setIsSpeaking(false);
+    };
+    utterance.onerror = () => {
+      speakingRef.current = false;
+      setIsSpeaking(false);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  }, [text, italianVoice]);
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (!o) cancel();
-      }}
-    >
-      <PopoverTrigger
+    <Tooltip>
+      <TooltipTrigger
         render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={title}
-            title={title}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              speak();
+            }}
+            className="flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+            aria-label={isSpeaking ? "Ferma lettura" : "Leggi ad alta voce"}
           />
         }
       >
-        <InfoIcon className="size-4" />
-      </PopoverTrigger>
-      <PopoverContent className="w-72 text-sm">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="font-medium">{title}</p>
-          {isSupported && (
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => (isSpeaking ? cancel() : speak(spoken))}
-              aria-label={isSpeaking ? "Ferma lettura" : "Leggi ad alta voce"}
-              title={isSpeaking ? "Ferma lettura" : "Leggi ad alta voce"}
-            >
-              {isSpeaking ? (
-                <VolumeXIcon className="size-3.5" />
-              ) : (
-                <Volume2Icon className="size-3.5" />
-              )}
-            </Button>
-          )}
-        </div>
-        <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+        {isSpeaking ? (
+          <VolumeXIcon className="size-4" />
+        ) : (
+          <InfoIcon className="size-4" />
+        )}
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-72">
+        <p className="mb-1 font-medium">{title}</p>
+        <ul className="list-disc space-y-0.5 pl-4">
           {items.map((item, i) => (
             <li key={i}>{item}</li>
           ))}
         </ul>
-      </PopoverContent>
-    </Popover>
+      </TooltipContent>
+    </Tooltip>
   );
 }
