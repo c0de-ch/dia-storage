@@ -80,6 +80,7 @@ export const collectionPatchSchema = z
   .object({
     name: nonEmptyTrimmedString.optional(),
     description: z.string().trim().max(5000).nullable().optional(),
+    coverSlideId: z.number().int().positive().nullable().optional(),
   })
   .strict();
 

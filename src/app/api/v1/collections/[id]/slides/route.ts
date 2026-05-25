@@ -66,6 +66,14 @@ export const POST = withAuth(async (request: NextRequest, context) => {
           slideId,
         }))
       );
+
+      // Default the album cover to the first added photo if none is set yet.
+      if (!collection.coverSlideId) {
+        await db
+          .update(schema.collections)
+          .set({ coverSlideId: toInsert[0], updatedAt: new Date() })
+          .where(eq(schema.collections.id, numericId));
+      }
     }
     const added = toInsert.length;
 

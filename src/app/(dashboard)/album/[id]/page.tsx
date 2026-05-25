@@ -74,7 +74,20 @@ export default function AlbumDetailPage() {
         return;
       }
       const cData = await cRes.json();
-      setAlbum(cData.collection);
+      const coll = cData.collection as Album;
+      // Default the cover to the first photo if none is set yet, so the album
+      // card shows a thumbnail.
+      const firstSlide = coll.slides?.[0];
+      if (!coll.coverSlideId && firstSlide) {
+        coll.coverSlideId = firstSlide.id;
+        fetch(`/api/v1/collections/${albumId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ coverSlideId: firstSlide.id }),
+          credentials: "include",
+        }).catch(() => {});
+      }
+      setAlbum(coll);
       if (listRes.ok) {
         const lData = await listRes.json();
         setAllAlbums(
@@ -135,6 +148,22 @@ export default function AlbumDetailPage() {
     if (res.ok) {
       toast.success(t("success.collectionDeleted"));
       router.push("/galleria?view=albums");
+    } else {
+      toast.error(t("errors.generic"));
+    }
+  }
+
+  async function setCover(slideId: number) {
+    const res = await fetch(`/api/v1/collections/${albumId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coverSlideId: slideId }),
+      credentials: "include",
+    });
+    if (res.ok) {
+      setAlbum((a) => (a ? { ...a, coverSlideId: slideId } : a));
+      setSelected(new Set());
+      toast.success("Copertina aggiornata");
     } else {
       toast.error(t("errors.generic"));
     }
@@ -320,6 +349,17 @@ export default function AlbumDetailPage() {
               <span className="text-xs text-muted-foreground">
                 {selected.size} selezionate
               </span>
+              {selected.size === 1 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => setCover([...selected][0]!)}
+                >
+                  <ImageIcon />
+                  Imposta copertina
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
@@ -397,6 +437,11 @@ export default function AlbumDetailPage() {
                   />
                 </div>
               </div>
+              {album.coverSlideId === slide.id && (
+                <span className="absolute top-1.5 right-1.5 z-10 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
+                  Copertina
+                </span>
+              )}
               <Link href={`/galleria/${slide.id}`} className="block size-full">
                 <Image
                   src={`/api/v1/slides/${slide.id}/thumbnail`}
