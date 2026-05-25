@@ -1319,8 +1319,8 @@ export default function ImpostazioniPage() {
                             <SelectItem value="claude-sonnet-4-6">
                               Claude Sonnet 4.6 (bilanciato)
                             </SelectItem>
-                            <SelectItem value="claude-opus-4-6">
-                              Claude Opus 4.6 (avanzato)
+                            <SelectItem value="claude-opus-4-7">
+                              Claude Opus 4.7 (avanzato)
                             </SelectItem>
                           </SelectContent>
                         </Select>
