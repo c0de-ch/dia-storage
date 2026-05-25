@@ -96,7 +96,7 @@ function SlideEditor({ slide }: { slide: Slide }) {
               src={`/api/v1/slides/${slide.id}/medium?v=${version}`}
               alt={slide.originalFilename ?? "Diapositiva"}
               onClick={() => setLightboxOpen(true)}
-              className="max-h-full max-w-full cursor-zoom-in object-contain"
+              className="max-h-full max-w-full cursor-pointer object-contain"
             />
           </div>
           <div className="flex flex-wrap items-center justify-center gap-1.5">

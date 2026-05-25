@@ -39,6 +39,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { LocationPicker } from "@/components/location-picker";
 import { ImageLightbox } from "@/components/image-lightbox";
+import { HelpPopover } from "@/components/help-popover";
 
 interface BatchSlide {
   id: string;
@@ -172,7 +173,7 @@ function BatchCard({
                 if (e.key === "Enter" || e.key === " ") setLightboxSlide(slide);
               }}
               className={cn(
-                "group/thumb relative aspect-square cursor-zoom-in overflow-hidden rounded-md border bg-muted transition-all hover:opacity-90",
+                "group/thumb relative aspect-square cursor-pointer overflow-hidden rounded-md border bg-muted transition-all hover:opacity-90",
                 selected.has(slide.id) && "ring-2 ring-primary"
               )}
             >
@@ -561,7 +562,17 @@ export default function CodaPage() {
     <div className={cn("flex flex-col gap-6", selected.size > 0 && "pb-24")}>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("queue.incomingTitle")}</h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-2xl font-bold tracking-tight">{t("queue.incomingTitle")}</h1>
+            <HelpPopover
+              items={[
+                "Clicca una foto per ingrandirla.",
+                "Spunta più foto e usa la barra in basso per ruotarle o capovolgerle insieme.",
+                "«Pubblica tutto» archivia tutti i lotti; il titolo del lotto diventa il nome dell'album.",
+                "«Modifica singola» apre il lotto per modificare ogni foto.",
+              ]}
+            />
+          </div>
           <p className="text-muted-foreground">
             {t("queue.subtitle")}
           </p>
