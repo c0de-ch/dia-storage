@@ -44,8 +44,8 @@ interface Batch {
   count: number;
   source: "web" | "macos" | "api";
   uploadedAt: string;
-  magazineName?: string;
-  date?: string;
+  title?: string;
+  dateTaken?: string;
   location?: string;
   notes?: string;
 }
@@ -93,8 +93,8 @@ function BatchCard({
   onPublish: (id: string, meta: BatchMeta) => void;
   onDelete: (id: string) => void;
 }) {
-  const [title, setTitle] = useState(batch.magazineName ?? "");
-  const [date, setDate] = useState(batch.date ?? "");
+  const [title, setTitle] = useState(batch.title ?? "");
+  const [date, setDate] = useState(batch.dateTaken ?? "");
   const [location, setLocation] = useState(batch.location ?? "");
   const [notes, setNotes] = useState(batch.notes ?? "");
   const [publishing, setPublishing] = useState(false);
@@ -106,11 +106,10 @@ function BatchCard({
     setPublishing(true);
     try {
       await onPublish(batch.id, {
-        magazineName: title,
-        date,
+        title,
+        dateTaken: date,
         location,
         notes,
-        applyToAll: true,
       });
     } finally {
       setPublishing(false);
@@ -300,11 +299,10 @@ function BatchCard({
 }
 
 interface BatchMeta {
-  magazineName: string;
-  date: string;
+  title: string;
+  dateTaken: string;
   location: string;
   notes: string;
-  applyToAll: boolean;
 }
 
 export default function CodaPage() {
@@ -321,21 +319,32 @@ export default function CodaPage() {
         const data = await res.json();
         const raw = data.batches ?? data.items ?? [];
         // Map API response to Batch interface
-        const mapped: Batch[] = raw.map((b: Record<string, unknown>) => ({
-          id: (b.batchId ?? b.id ?? String(Math.random())) as string,
-          slides: Array.isArray(b.slides)
-            ? b.slides.map((s: Record<string, unknown>) => ({
-                id: String(s.id ?? ""),
-                thumbnailUrl: s.id
-                  ? `/api/v1/slides/${s.id}/thumbnail`
-                  : undefined,
-                originalFilename: s.originalFilename as string | undefined,
-              }))
-            : [],
-          count: (b.count ?? 0) as number,
-          source: (b.source ?? "web") as Batch["source"],
-          uploadedAt: (b.createdAt ?? b.uploadedAt ?? new Date().toISOString()) as string,
-        }));
+        const mapped: Batch[] = raw.map((b: Record<string, unknown>) => {
+          const slidesRaw = Array.isArray(b.slides)
+            ? (b.slides as Record<string, unknown>[])
+            : [];
+          const first = slidesRaw[0];
+          return {
+            id: (b.batchId ?? b.id ?? String(Math.random())) as string,
+            slides: slidesRaw.map((s) => ({
+              id: String(s.id ?? ""),
+              thumbnailUrl: s.id
+                ? `/api/v1/slides/${s.id}/thumbnail`
+                : undefined,
+              originalFilename: s.originalFilename as string | undefined,
+            })),
+            count: (b.count ?? 0) as number,
+            source: (b.source ?? "web") as Batch["source"],
+            uploadedAt: (b.createdAt ?? b.uploadedAt ?? new Date().toISOString()) as string,
+            // Pre-fill the batch form with the metadata captured at upload.
+            title: (first?.title as string | undefined) ?? "",
+            dateTaken:
+              (first?.dateTakenPrecise as string | undefined) ??
+              (first?.dateTaken as string | undefined) ??
+              "",
+            location: (first?.location as string | undefined) ?? "",
+          };
+        });
         setBatches(mapped);
       }
     } catch {
@@ -355,7 +364,11 @@ export default function CodaPage() {
         const res = await fetch("/api/v1/slides/batch/archive", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ batchId, metadata: meta }),
+          body: JSON.stringify({
+            batchId,
+            metadata: meta,
+            collectionName: meta.title || undefined,
+          }),
           credentials: "include",
         });
         if (!res.ok) throw new Error();

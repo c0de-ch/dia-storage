@@ -62,6 +62,7 @@ export const slidePatchSchema = z
   .object({
     title: nullableTrimmedString,
     dateTaken: nullableTrimmedString,
+    dateTakenPrecise: nullableTrimmedString,
     location: nullableTrimmedString,
     magazineId: z.number().int().positive().nullable().optional(),
     slotNumber: z.number().int().positive().nullable().optional(),
