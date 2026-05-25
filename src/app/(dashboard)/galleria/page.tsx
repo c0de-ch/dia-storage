@@ -644,7 +644,7 @@ function AlbumCard({ collection }: { collection: Collection }) {
     : null;
 
   return (
-    <Link href={`/galleria?view=all&collectionId=${collection.id}`}>
+    <Link href={`/album/${collection.id}`}>
       <Card className="group cursor-pointer overflow-hidden transition-all hover:ring-2 hover:ring-ring/50">
         <div className="relative aspect-[4/3] overflow-hidden bg-muted">
           {coverUrl ? (
