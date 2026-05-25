@@ -15,6 +15,9 @@ interface ImageViewerProps {
   alt?: string;
   downloadUrl?: string;
   className?: string;
+  /** Where the zoom/fullscreen/download toolbar sits. Defaults to top-right;
+   *  use bottom-right inside a modal so it clears the dialog close button. */
+  controlsPosition?: "top-right" | "bottom-right";
 }
 
 const MIN_ZOOM = 1;
@@ -26,6 +29,7 @@ export function ImageViewer({
   alt = "Immagine",
   downloadUrl,
   className,
+  controlsPosition = "top-right",
 }: ImageViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -121,7 +125,12 @@ export function ImageViewer({
       )}
     >
       {/* Controls */}
-      <div className="absolute top-2 right-2 z-10 flex gap-1 rounded-lg bg-background/80 p-1 opacity-0 shadow backdrop-blur-sm transition-opacity group-hover/viewer:opacity-100">
+      <div
+        className={cn(
+          "absolute right-2 z-10 flex gap-1 rounded-lg bg-background/80 p-1 opacity-0 shadow backdrop-blur-sm transition-opacity group-hover/viewer:opacity-100",
+          controlsPosition === "bottom-right" ? "bottom-2" : "top-2"
+        )}
+      >
         {isZoomed && (
           <Button variant="ghost" size="icon-xs" onClick={resetView} title="Reimposta zoom">
             <RotateCcwIcon className="size-3.5" />

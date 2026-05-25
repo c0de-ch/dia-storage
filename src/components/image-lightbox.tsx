@@ -31,6 +31,7 @@ export function ImageLightbox({
             src={src}
             alt={alt ?? "Anteprima immagine"}
             {...(downloadUrl ? { downloadUrl } : {})}
+            controlsPosition="bottom-right"
             className="h-[80vh] w-full border-0"
           />
         )}
