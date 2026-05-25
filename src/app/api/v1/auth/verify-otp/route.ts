@@ -9,6 +9,7 @@ import {
   clientIp,
   recordAuthAttempt,
 } from '@/lib/auth/rate-limit';
+import { getConfig } from '@/lib/config/loader';
 
 export async function POST(request: NextRequest) {
   try {
@@ -95,7 +96,11 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies();
     cookieStore.set('dia_session', sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      // Match the canonical session helper (lib/auth/session.ts): only mark the
+      // cookie Secure when the app is actually served over HTTPS. Forcing it on
+      // for NODE_ENV=production breaks plain-HTTP/LAN deployments because the
+      // browser silently drops a Secure cookie sent over http://.
+      secure: getConfig().app.url.startsWith('https'),
       sameSite: 'lax',
       path: '/',
       expires: expiresAt,
