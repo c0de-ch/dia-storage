@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { HelpPopover } from "@/components/help-popover";
 import {
   Dialog,
   DialogContent,
@@ -303,7 +304,17 @@ export default function AlbumDetailPage() {
             <ArrowLeftIcon />
             {t("gallery.albums")}
           </Button>
-          <h1 className="text-2xl font-bold tracking-tight">{album.name}</h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-2xl font-bold tracking-tight">{album.name}</h1>
+            <HelpPopover
+              items={[
+                "Clicca una foto per aprirla.",
+                "Spunta le foto, poi «Sposta in» per spostarle in un altro album o «Rimuovi».",
+                "Con una sola foto selezionata, «Imposta copertina» sceglie la miniatura.",
+                "«Aggiungi foto» inserisce altre diapositive nell'album.",
+              ]}
+            />
+          </div>
           <p className="text-sm text-muted-foreground">
             {slides.length === 1
               ? "1 foto"

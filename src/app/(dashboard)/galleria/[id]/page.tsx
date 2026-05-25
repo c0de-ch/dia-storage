@@ -45,6 +45,7 @@ import {
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ImageViewer } from "@/components/image-viewer";
+import { HelpPopover } from "@/components/help-popover";
 import { MetadataForm } from "@/components/metadata-form";
 import { ExifPanel } from "@/components/exif-panel";
 import { t } from "@/lib/i18n";
@@ -429,6 +430,14 @@ export default function SlideDetailPage() {
               <SlidersHorizontalIcon className="size-3.5" />
               Correggi
             </Button>
+            <HelpPopover
+              items={[
+                "Scorri sull'immagine per ingrandire, trascina per spostarti.",
+                "Ruota a sinistra/destra o capovolgi in orizzontale/verticale.",
+                "«Correggi» regola luminosità, contrasto e saturazione.",
+                "Modifica titolo, data, luogo e note nel pannello a destra.",
+              ]}
+            />
           </div>
 
           {/* Color correction (live CSS preview, baked on Apply) */}

@@ -170,7 +170,7 @@ export function ImageViewer({
       <div
         className={cn(
           "flex h-full w-full items-center justify-center",
-          isZoomed ? "cursor-grab" : "cursor-zoom-in",
+          isZoomed ? "cursor-grab" : "cursor-default",
           isDragging && "cursor-grabbing"
         )}
         onWheel={handleWheel}
