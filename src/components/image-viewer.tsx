@@ -18,6 +18,9 @@ interface ImageViewerProps {
   /** Where the zoom/fullscreen/download toolbar sits. Defaults to top-right;
    *  use bottom-right inside a modal so it clears the dialog close button. */
   controlsPosition?: "top-right" | "bottom-right";
+  /** Optional CSS filter (e.g. "brightness(1.1) contrast(0.9)") for live,
+   *  non-destructive color-correction preview. */
+  imageFilter?: string;
 }
 
 const MIN_ZOOM = 1;
@@ -30,6 +33,7 @@ export function ImageViewer({
   downloadUrl,
   className,
   controlsPosition = "top-right",
+  imageFilter,
 }: ImageViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -183,6 +187,7 @@ export function ImageViewer({
           className="max-h-full max-w-full select-none object-contain transition-transform duration-75"
           style={{
             transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+            filter: imageFilter,
           }}
         />
       </div>

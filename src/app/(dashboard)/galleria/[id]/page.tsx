@@ -15,6 +15,7 @@ import {
   Loader2Icon,
   RotateCcwIcon,
   RotateCwIcon,
+  SlidersHorizontalIcon,
   Trash2Icon,
   Volume2Icon,
   VolumeOffIcon,
@@ -64,6 +65,11 @@ export default function SlideDetailPage() {
   const [speaking, setSpeaking] = useState(false);
   const [imgVersion, setImgVersion] = useState(0);
   const [transformOp, setTransformOp] = useState<string | null>(null);
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [brightness, setBrightness] = useState(1);
+  const [contrast, setContrast] = useState(1);
+  const [saturation, setSaturation] = useState(1);
+  const [applyingAdjust, setApplyingAdjust] = useState(false);
 
   // Fetch slide
   const fetchSlide = useCallback(async () => {
@@ -195,6 +201,30 @@ export default function SlideDetailPage() {
     }
   }
 
+  // Bake the previewed color correction into the image.
+  async function applyAdjust() {
+    if (brightness === 1 && contrast === 1 && saturation === 1) return;
+    setApplyingAdjust(true);
+    try {
+      const res = await fetch(`/api/v1/slides/${slideId}/adjust`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brightness, contrast, saturation }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error();
+      setBrightness(1);
+      setContrast(1);
+      setSaturation(1);
+      setImgVersion((v) => v + 1);
+      toast.success("Correzione applicata");
+    } catch {
+      toast.error("Errore durante la correzione");
+    } finally {
+      setApplyingAdjust(false);
+    }
+  }
+
   // AI describe image
   async function handleDescribe() {
     setDescribing(true);
@@ -270,6 +300,11 @@ export default function SlideDetailPage() {
   const displayTitle =
     slide.title || slide.originalFilename || `Diapositiva #${slide.id}`;
 
+  const colorFilter =
+    brightness !== 1 || contrast !== 1 || saturation !== 1
+      ? `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`
+      : undefined;
+
   return (
     <div className="flex flex-col gap-4 p-4 sm:p-6">
       {/* Breadcrumb */}
@@ -325,6 +360,7 @@ export default function SlideDetailPage() {
             alt={displayTitle}
             downloadUrl={`/api/v1/slides/${slide.id}/original`}
             className="aspect-[4/3] w-full"
+            {...(adjustOpen && colorFilter ? { imageFilter: colorFilter } : {})}
           />
 
           {/* Rotate / flip the original */}
@@ -384,7 +420,71 @@ export default function SlideDetailPage() {
                 <FlipVerticalIcon className="size-3.5" />
               )}
             </Button>
+            <Button
+              variant={adjustOpen ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setAdjustOpen((o) => !o)}
+              title="Correggi colore"
+            >
+              <SlidersHorizontalIcon className="size-3.5" />
+              Correggi
+            </Button>
           </div>
+
+          {/* Color correction (live CSS preview, baked on Apply) */}
+          {adjustOpen && (
+            <div className="flex flex-col gap-3 rounded-lg border p-3">
+              {(
+                [
+                  ["Luminosità", brightness, setBrightness],
+                  ["Contrasto", contrast, setContrast],
+                  ["Saturazione", saturation, setSaturation],
+                ] as const
+              ).map(([label, value, setter]) => (
+                <label key={label} className="flex items-center gap-3 text-sm">
+                  <span className="w-24 shrink-0 text-muted-foreground">
+                    {label}
+                  </span>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={1.5}
+                    step={0.05}
+                    value={value}
+                    onChange={(e) => setter(parseFloat(e.target.value))}
+                    className="flex-1 accent-primary"
+                  />
+                  <span className="w-10 shrink-0 text-right text-xs tabular-nums">
+                    {Math.round(value * 100)}%
+                  </span>
+                </label>
+              ))}
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={applyAdjust}
+                  disabled={applyingAdjust || !colorFilter}
+                >
+                  {applyingAdjust ? (
+                    <Loader2Icon className="size-3.5 animate-spin" />
+                  ) : null}
+                  Applica
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setBrightness(1);
+                    setContrast(1);
+                    setSaturation(1);
+                  }}
+                  disabled={!colorFilter}
+                >
+                  Ripristina
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* AI Description */}
           <div className="flex items-center gap-2">
