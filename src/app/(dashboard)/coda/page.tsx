@@ -32,6 +32,8 @@ import {
   RotateCwIcon,
   FlipHorizontalIcon,
   FlipVerticalIcon,
+  CheckCheckIcon,
+  XIcon,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -94,10 +96,16 @@ function BatchCard({
   batch,
   onPublish,
   onDelete,
+  selected,
+  versions,
+  onToggleSelect,
 }: {
   batch: Batch;
   onPublish: (id: string, meta: BatchMeta) => void;
   onDelete: (id: string) => void;
+  selected: Set<string>;
+  versions: Record<string, number>;
+  onToggleSelect: (id: string) => void;
 }) {
   const [title, setTitle] = useState(batch.title ?? "");
   const [date, setDate] = useState(batch.dateTaken ?? "");
@@ -107,9 +115,6 @@ function BatchCard({
   const [deleting, setDeleting] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [lightboxSlide, setLightboxSlide] = useState<BatchSlide | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [transforming, setTransforming] = useState(false);
-  const [versions, setVersions] = useState<Record<string, number>>({});
 
   const visibleSlides = batch.slides.slice(0, expanded ? 50 : 8);
 
@@ -136,49 +141,6 @@ function BatchCard({
     }
   }
 
-  function toggleSelect(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    setSelected((prev) =>
-      prev.size === visibleSlides.length
-        ? new Set()
-        : new Set(visibleSlides.map((s) => s.id))
-    );
-  }
-
-  // Apply a rotate/flip to every selected slide, then cache-bust their thumbs.
-  async function applyToSelected(op: string) {
-    if (selected.size === 0) return;
-    setTransforming(true);
-    let ok = 0;
-    for (const id of [...selected]) {
-      try {
-        const res = await fetch(`/api/v1/slides/${id}/transform`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ op }),
-          credentials: "include",
-        });
-        if (res.ok) {
-          ok += 1;
-          setVersions((v) => ({ ...v, [id]: (v[id] ?? 0) + 1 }));
-        }
-      } catch {
-        // keep going
-      }
-    }
-    setTransforming(false);
-    if (ok > 0) toast.success(`${ok} immagini aggiornate`);
-    else toast.error("Errore durante la trasformazione");
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -198,37 +160,6 @@ function BatchCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {/* Selection toolbar — rotate/flip applies to all selected photos */}
-        {visibleSlides.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={toggleSelectAll}>
-              {selected.size === visibleSlides.length
-                ? "Deseleziona tutte"
-                : "Seleziona tutte"}
-            </Button>
-            {selected.size > 0 && (
-              <>
-                <span className="text-xs text-muted-foreground">
-                  {selected.size} selezionate
-                </span>
-                <Button variant="outline" size="sm" disabled={transforming} onClick={() => applyToSelected("rotate-ccw")} title="Ruota a sinistra">
-                  <RotateCcwIcon className="size-4" />
-                </Button>
-                <Button variant="outline" size="sm" disabled={transforming} onClick={() => applyToSelected("rotate-cw")} title="Ruota a destra">
-                  <RotateCwIcon className="size-4" />
-                </Button>
-                <Button variant="outline" size="sm" disabled={transforming} onClick={() => applyToSelected("flip-h")} title="Capovolgi orizzontale">
-                  <FlipHorizontalIcon className="size-4" />
-                </Button>
-                <Button variant="outline" size="sm" disabled={transforming} onClick={() => applyToSelected("flip-v")} title="Capovolgi verticale">
-                  <FlipVerticalIcon className="size-4" />
-                </Button>
-                {transforming && <Loader2Icon className="size-4 animate-spin" />}
-              </>
-            )}
-          </div>
-        )}
-
         {/* Thumbnail grid */}
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
           {visibleSlides.map((slide) => (
@@ -258,7 +189,7 @@ function BatchCard({
                 <div className="rounded bg-background/80 p-0.5 backdrop-blur-sm">
                   <Checkbox
                     checked={selected.has(slide.id)}
-                    onCheckedChange={() => toggleSelect(slide.id)}
+                    onCheckedChange={() => onToggleSelect(slide.id)}
                   />
                 </div>
               </div>
@@ -418,6 +349,10 @@ export default function CodaPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [publishingAll, setPublishingAll] = useState(false);
+  // Selection spans every batch, so one central bar can transform across them.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [versions, setVersions] = useState<Record<string, number>>({});
+  const [transforming, setTransforming] = useState(false);
 
   const fetchBatches = useCallback(async () => {
     try {
@@ -483,6 +418,7 @@ export default function CodaPage() {
         if (!res.ok) throw new Error();
         toast.success(t("success.slidesPublished"));
         setBatches((prev) => prev.filter((b) => b.id !== batchId));
+        setSelected(new Set());
       } catch {
         toast.error("Errore durante la pubblicazione del lotto");
       }
@@ -501,6 +437,7 @@ export default function CodaPage() {
       if (!res.ok) throw new Error();
       toast.success(t("success.deleted"));
       setBatches((prev) => prev.filter((b) => b.id !== batchId));
+      setSelected(new Set());
     } catch {
       toast.error(t("errors.deleteFailed"));
     }
@@ -541,6 +478,7 @@ export default function CodaPage() {
       }
     }
     setPublishingAll(false);
+    setSelected(new Set());
     if (published === targets.length) {
       toast.success(t("success.slidesPublished"));
     } else {
@@ -549,6 +487,57 @@ export default function CodaPage() {
       );
     }
   }, [batches, totalSlides]);
+
+  const allIds = useMemo(
+    () => batches.flatMap((b) => b.slides.map((s) => s.id)),
+    [batches]
+  );
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    setSelected((prev) =>
+      prev.size === allIds.length && allIds.length > 0
+        ? new Set()
+        : new Set(allIds)
+    );
+  }, [allIds]);
+
+  // Apply a rotate/flip to every selected photo across all batches.
+  const applyToSelected = useCallback(
+    async (op: string) => {
+      if (selected.size === 0) return;
+      setTransforming(true);
+      let ok = 0;
+      for (const id of [...selected]) {
+        try {
+          const res = await fetch(`/api/v1/slides/${id}/transform`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ op }),
+            credentials: "include",
+          });
+          if (res.ok) {
+            ok += 1;
+            setVersions((v) => ({ ...v, [id]: (v[id] ?? 0) + 1 }));
+          }
+        } catch {
+          // keep going
+        }
+      }
+      setTransforming(false);
+      if (ok > 0) toast.success(`${ok} immagini aggiornate`);
+      else toast.error("Errore durante la trasformazione");
+    },
+    [selected]
+  );
 
   const grouped = useMemo(() => groupByDate(batches), [batches]);
 
@@ -569,7 +558,7 @@ export default function CodaPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className={cn("flex flex-col gap-6", selected.size > 0 && "pb-24")}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t("queue.incomingTitle")}</h1>
@@ -578,14 +567,22 @@ export default function CodaPage() {
           </p>
         </div>
         {batches.length > 0 && (
-          <Button onClick={handlePublishAll} disabled={publishingAll}>
-            {publishingAll ? (
-              <Loader2Icon className="animate-spin" />
-            ) : (
-              <SendIcon />
-            )}
-            Pubblica tutto
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={selectAll}>
+              <CheckCheckIcon />
+              {selected.size === allIds.length && allIds.length > 0
+                ? "Deseleziona tutte"
+                : "Seleziona tutte"}
+            </Button>
+            <Button onClick={handlePublishAll} disabled={publishingAll}>
+              {publishingAll ? (
+                <Loader2Icon className="animate-spin" />
+              ) : (
+                <SendIcon />
+              )}
+              Pubblica tutto
+            </Button>
+          </div>
         )}
       </div>
 
@@ -611,10 +608,47 @@ export default function CodaPage() {
                 batch={batch}
                 onPublish={handlePublish}
                 onDelete={handleDelete}
+                selected={selected}
+                versions={versions}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </div>
         ))
+      )}
+
+      {/* Central action bar — applies to the selection across all batches */}
+      {selected.size > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-50 flex items-center justify-between gap-3 border-t bg-background/95 px-4 py-3 shadow-lg backdrop-blur sm:px-6">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setSelected(new Set())}
+              title="Deseleziona"
+            >
+              <XIcon className="size-4" />
+            </Button>
+            <span className="text-sm font-medium">
+              {selected.size} selezionate
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={transforming} onClick={() => applyToSelected("rotate-ccw")} title="Ruota a sinistra">
+              <RotateCcwIcon className="size-4" />
+            </Button>
+            <Button variant="outline" size="sm" disabled={transforming} onClick={() => applyToSelected("rotate-cw")} title="Ruota a destra">
+              <RotateCwIcon className="size-4" />
+            </Button>
+            <Button variant="outline" size="sm" disabled={transforming} onClick={() => applyToSelected("flip-h")} title="Capovolgi orizzontale">
+              <FlipHorizontalIcon className="size-4" />
+            </Button>
+            <Button variant="outline" size="sm" disabled={transforming} onClick={() => applyToSelected("flip-v")} title="Capovolgi verticale">
+              <FlipVerticalIcon className="size-4" />
+            </Button>
+            {transforming && <Loader2Icon className="size-4 animate-spin" />}
+          </div>
+        </div>
       )}
     </div>
   );
