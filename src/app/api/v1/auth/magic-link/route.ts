@@ -9,6 +9,7 @@ import {
   clientIp,
   recordAuthAttempt,
 } from '@/lib/auth/rate-limit';
+import { getConfig } from '@/lib/config/loader';
 
 function getOrigin(request: NextRequest): string {
   const host = request.headers.get('host') ?? new URL(request.url).host;
@@ -85,7 +86,9 @@ export async function GET(request: NextRequest) {
     const cookieStore = await cookies();
     cookieStore.set('dia_session', sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      // Only Secure over real HTTPS (see lib/auth/session.ts); forcing it for
+      // NODE_ENV=production breaks plain-HTTP/LAN logins.
+      secure: getConfig().app.url.startsWith('https'),
       sameSite: 'lax',
       path: '/',
       expires: expiresAt,

@@ -44,29 +44,29 @@ const themes: ThemeOption[] = [
     value: "light",
     labelKey: "settings.themeLight",
     description:
-      "Palette fotografica calda con primario ambra e accenti teal. Ideale per la luce diurna.",
+      "Palette acqua luminosa con primario turchese e accenti teal. Ideale per la luce diurna.",
     icon: SunIcon,
     swatches: [
-      "oklch(0.62 0.16 50)",
+      "oklch(0.6 0.13 215)",
       "oklch(0.93 0.04 195)",
       "oklch(0.6 0.16 320)",
       "oklch(0.7 0.14 130)",
     ],
-    preview: "linear-gradient(135deg, oklch(0.985 0.005 75), oklch(0.94 0.025 70))",
+    preview: "linear-gradient(135deg, oklch(0.985 0.004 220), oklch(0.94 0.02 220))",
   },
   {
     value: "dark",
     labelKey: "settings.themeDark",
     description:
-      "Stessa palette calda in versione scura. Riposa la vista nelle ore serali.",
+      "Stessa palette acqua in versione scura. Riposa la vista nelle ore serali.",
     icon: MoonIcon,
     swatches: [
-      "oklch(0.78 0.15 65)",
+      "oklch(0.75 0.12 210)",
       "oklch(0.32 0.045 200)",
       "oklch(0.7 0.17 320)",
       "oklch(0.78 0.15 130)",
     ],
-    preview: "linear-gradient(135deg, oklch(0.16 0.018 60), oklch(0.28 0.025 60))",
+    preview: "linear-gradient(135deg, oklch(0.16 0.02 235), oklch(0.28 0.025 235))",
   },
   {
     value: "vivid",
@@ -105,13 +105,13 @@ const themes: ThemeOption[] = [
       "Segue automaticamente le preferenze del tuo sistema operativo (chiaro o scuro).",
     icon: MonitorIcon,
     swatches: [
-      "oklch(0.62 0.16 50)",
-      "oklch(0.78 0.15 65)",
+      "oklch(0.6 0.13 215)",
+      "oklch(0.75 0.12 210)",
       "oklch(0.93 0.04 195)",
       "oklch(0.32 0.045 200)",
     ],
     preview:
-      "linear-gradient(135deg, oklch(0.985 0.005 75) 0%, oklch(0.985 0.005 75) 50%, oklch(0.16 0.018 60) 50%, oklch(0.16 0.018 60) 100%)",
+      "linear-gradient(135deg, oklch(0.985 0.004 220) 0%, oklch(0.985 0.004 220) 50%, oklch(0.16 0.02 235) 50%, oklch(0.16 0.02 235) 100%)",
   },
 ];
 
