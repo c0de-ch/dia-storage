@@ -10,12 +10,12 @@ import { apiError } from "@/lib/api/errors";
 const COST_PER_1M_INPUT: Record<string, number> = {
   "claude-haiku-4-5-20251001": 0.80,
   "claude-sonnet-4-6": 3.0,
-  "claude-opus-4-6": 15.0,
+  "claude-opus-4-7": 15.0,
 };
 const COST_PER_1M_OUTPUT: Record<string, number> = {
   "claude-haiku-4-5-20251001": 4.0,
   "claude-sonnet-4-6": 15.0,
-  "claude-opus-4-6": 75.0,
+  "claude-opus-4-7": 75.0,
 };
 
 const KNOWLEDGE = `PAGES:
