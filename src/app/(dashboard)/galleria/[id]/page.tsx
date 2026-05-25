@@ -9,13 +9,18 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   EyeIcon,
+  FlipHorizontalIcon,
+  FlipVerticalIcon,
   ImageIcon,
   Loader2Icon,
+  RotateCcwIcon,
+  RotateCwIcon,
   Trash2Icon,
   Volume2Icon,
   VolumeOffIcon,
   XIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
@@ -57,6 +62,8 @@ export default function SlideDetailPage() {
   const [describing, setDescribing] = useState(false);
   const [description, setDescription] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
+  const [imgVersion, setImgVersion] = useState(0);
+  const [transformOp, setTransformOp] = useState<string | null>(null);
 
   // Fetch slide
   const fetchSlide = useCallback(async () => {
@@ -166,6 +173,25 @@ export default function SlideDetailPage() {
       await fetch(`/api/v1/slides/${slideId}/exif`, { method: "POST" });
     } catch (error) {
       console.error("Errore nella scrittura EXIF:", error);
+    }
+  }
+
+  // Rotate / flip the original image and refresh the preview.
+  async function applyTransform(op: string) {
+    setTransformOp(op);
+    try {
+      const res = await fetch(`/api/v1/slides/${slideId}/transform`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error();
+      setImgVersion((v) => v + 1); // cache-bust the preview
+    } catch {
+      toast.error("Errore durante la trasformazione");
+    } finally {
+      setTransformOp(null);
     }
   }
 
@@ -295,11 +321,70 @@ export default function SlideDetailPage() {
         {/* Left: Image viewer + describe */}
         <div className="flex flex-col gap-3">
           <ImageViewer
-            src={`/api/v1/slides/${slide.id}/medium`}
+            src={`/api/v1/slides/${slide.id}/medium?v=${imgVersion}`}
             alt={displayTitle}
             downloadUrl={`/api/v1/slides/${slide.id}/original`}
             className="aspect-[4/3] w-full"
           />
+
+          {/* Rotate / flip the original */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-xs text-muted-foreground">
+              Modifica immagine:
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyTransform("rotate-ccw")}
+              disabled={transformOp !== null}
+              title="Ruota a sinistra"
+            >
+              {transformOp === "rotate-ccw" ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <RotateCcwIcon className="size-3.5" />
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyTransform("rotate-cw")}
+              disabled={transformOp !== null}
+              title="Ruota a destra"
+            >
+              {transformOp === "rotate-cw" ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <RotateCwIcon className="size-3.5" />
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyTransform("flip-h")}
+              disabled={transformOp !== null}
+              title="Capovolgi orizzontale"
+            >
+              {transformOp === "flip-h" ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <FlipHorizontalIcon className="size-3.5" />
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyTransform("flip-v")}
+              disabled={transformOp !== null}
+              title="Capovolgi verticale"
+            >
+              {transformOp === "flip-v" ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <FlipVerticalIcon className="size-3.5" />
+              )}
+            </Button>
+          </div>
 
           {/* AI Description */}
           <div className="flex items-center gap-2">
