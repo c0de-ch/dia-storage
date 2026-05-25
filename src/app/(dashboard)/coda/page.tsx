@@ -289,6 +289,7 @@ interface BatchMeta {
 export default function CodaPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [publishingAll, setPublishingAll] = useState(false);
 
   const fetchBatches = useCallback(async () => {
     try {
@@ -362,6 +363,50 @@ export default function CodaPage() {
     }
   }, []);
 
+  const totalSlides = useMemo(
+    () => batches.reduce((sum, b) => sum + b.count, 0),
+    [batches]
+  );
+
+  const handlePublishAll = useCallback(async () => {
+    if (batches.length === 0) return;
+    if (
+      !window.confirm(
+        `Pubblicare nella galleria tutte le ${totalSlides} diapositive in coda (${batches.length} lotti)?`
+      )
+    )
+      return;
+    setPublishingAll(true);
+    const targets = [...batches];
+    let published = 0;
+    for (const b of targets) {
+      try {
+        // No metadata payload: publish-all moves everything to the gallery
+        // as-is and preserves any per-slide metadata set in "Modifica singola".
+        const res = await fetch("/api/v1/slides/batch/archive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ batchId: b.id }),
+          credentials: "include",
+        });
+        if (res.ok) {
+          published += 1;
+          setBatches((prev) => prev.filter((x) => x.id !== b.id));
+        }
+      } catch {
+        // keep going; report at the end
+      }
+    }
+    setPublishingAll(false);
+    if (published === targets.length) {
+      toast.success(t("success.slidesPublished"));
+    } else {
+      toast.error(
+        `Pubblicati ${published}/${targets.length} lotti. Riprova per i restanti.`
+      );
+    }
+  }, [batches, totalSlides]);
+
   const grouped = useMemo(() => groupByDate(batches), [batches]);
 
   if (loading) {
@@ -382,11 +427,23 @@ export default function CodaPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t("queue.incomingTitle")}</h1>
-        <p className="text-muted-foreground">
-          {t("queue.subtitle")}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{t("queue.incomingTitle")}</h1>
+          <p className="text-muted-foreground">
+            {t("queue.subtitle")}
+          </p>
+        </div>
+        {batches.length > 0 && (
+          <Button onClick={handlePublishAll} disabled={publishingAll}>
+            {publishingAll ? (
+              <Loader2Icon className="animate-spin" />
+            ) : (
+              <SendIcon />
+            )}
+            Pubblica tutto
+          </Button>
+        )}
       </div>
 
       {batches.length === 0 ? (
