@@ -28,7 +28,13 @@ import {
   LaptopIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  RotateCcwIcon,
+  RotateCwIcon,
+  FlipHorizontalIcon,
+  FlipVerticalIcon,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import { LocationPicker } from "@/components/location-picker";
 import { ImageLightbox } from "@/components/image-lightbox";
 
@@ -101,6 +107,11 @@ function BatchCard({
   const [deleting, setDeleting] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [lightboxSlide, setLightboxSlide] = useState<BatchSlide | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [transforming, setTransforming] = useState(false);
+  const [versions, setVersions] = useState<Record<string, number>>({});
+
+  const visibleSlides = batch.slides.slice(0, expanded ? 50 : 8);
 
   async function handlePublish() {
     setPublishing(true);
@@ -125,6 +136,49 @@ function BatchCard({
     }
   }
 
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) =>
+      prev.size === visibleSlides.length
+        ? new Set()
+        : new Set(visibleSlides.map((s) => s.id))
+    );
+  }
+
+  // Apply a rotate/flip to every selected slide, then cache-bust their thumbs.
+  async function applyToSelected(op: string) {
+    if (selected.size === 0) return;
+    setTransforming(true);
+    let ok = 0;
+    for (const id of [...selected]) {
+      try {
+        const res = await fetch(`/api/v1/slides/${id}/transform`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ op }),
+          credentials: "include",
+        });
+        if (res.ok) {
+          ok += 1;
+          setVersions((v) => ({ ...v, [id]: (v[id] ?? 0) + 1 }));
+        }
+      } catch {
+        // keep going
+      }
+    }
+    setTransforming(false);
+    if (ok > 0) toast.success(`${ok} immagini aggiornate`);
+    else toast.error("Errore durante la trasformazione");
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -144,9 +198,40 @@ function BatchCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        {/* Selection toolbar — rotate/flip applies to all selected photos */}
+        {visibleSlides.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={toggleSelectAll}>
+              {selected.size === visibleSlides.length
+                ? "Deseleziona tutte"
+                : "Seleziona tutte"}
+            </Button>
+            {selected.size > 0 && (
+              <>
+                <span className="text-xs text-muted-foreground">
+                  {selected.size} selezionate
+                </span>
+                <Button variant="outline" size="sm" disabled={transforming} onClick={() => applyToSelected("rotate-ccw")} title="Ruota a sinistra">
+                  <RotateCcwIcon className="size-4" />
+                </Button>
+                <Button variant="outline" size="sm" disabled={transforming} onClick={() => applyToSelected("rotate-cw")} title="Ruota a destra">
+                  <RotateCwIcon className="size-4" />
+                </Button>
+                <Button variant="outline" size="sm" disabled={transforming} onClick={() => applyToSelected("flip-h")} title="Capovolgi orizzontale">
+                  <FlipHorizontalIcon className="size-4" />
+                </Button>
+                <Button variant="outline" size="sm" disabled={transforming} onClick={() => applyToSelected("flip-v")} title="Capovolgi verticale">
+                  <FlipVerticalIcon className="size-4" />
+                </Button>
+                {transforming && <Loader2Icon className="size-4 animate-spin" />}
+              </>
+            )}
+          </div>
+        )}
+
         {/* Thumbnail grid */}
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
-          {batch.slides.slice(0, expanded ? 50 : 8).map((slide) => (
+          {visibleSlides.map((slide) => (
             <div
               key={slide.id}
               role="button"
@@ -155,11 +240,31 @@ function BatchCard({
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") setLightboxSlide(slide);
               }}
-              className="relative aspect-square cursor-zoom-in overflow-hidden rounded-md border bg-muted transition-opacity hover:opacity-90"
+              className={cn(
+                "group/thumb relative aspect-square cursor-zoom-in overflow-hidden rounded-md border bg-muted transition-all hover:opacity-90",
+                selected.has(slide.id) && "ring-2 ring-primary"
+              )}
             >
+              {/* Selection checkbox */}
+              <div
+                className={cn(
+                  "absolute top-1.5 left-1.5 z-10 transition-opacity",
+                  selected.has(slide.id)
+                    ? "opacity-100"
+                    : "opacity-0 group-hover/thumb:opacity-100"
+                )}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="rounded bg-background/80 p-0.5 backdrop-blur-sm">
+                  <Checkbox
+                    checked={selected.has(slide.id)}
+                    onCheckedChange={() => toggleSelect(slide.id)}
+                  />
+                </div>
+              </div>
               {slide.thumbnailUrl ? (
                 <Image
-                  src={slide.thumbnailUrl}
+                  src={`${slide.thumbnailUrl}?v=${versions[slide.id] ?? 0}`}
                   alt={slide.originalFilename ?? "Diapositiva"}
                   fill
                   sizes="(max-width: 640px) 25vw, (max-width: 1024px) 12vw, 8vw"
@@ -286,7 +391,11 @@ function BatchCard({
         onOpenChange={(o) => {
           if (!o) setLightboxSlide(null);
         }}
-        src={lightboxSlide ? `/api/v1/slides/${lightboxSlide.id}/medium` : ""}
+        src={
+          lightboxSlide
+            ? `/api/v1/slides/${lightboxSlide.id}/medium?v=${versions[lightboxSlide.id] ?? 0}`
+            : ""
+        }
         alt={lightboxSlide?.originalFilename}
         downloadUrl={
           lightboxSlide
