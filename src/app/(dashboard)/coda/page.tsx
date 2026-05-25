@@ -30,6 +30,7 @@ import {
   ChevronUpIcon,
 } from "lucide-react";
 import { LocationPicker } from "@/components/location-picker";
+import { ImageLightbox } from "@/components/image-lightbox";
 
 interface BatchSlide {
   id: string;
@@ -99,6 +100,7 @@ function BatchCard({
   const [publishing, setPublishing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [lightboxSlide, setLightboxSlide] = useState<BatchSlide | null>(null);
 
   async function handlePublish() {
     setPublishing(true);
@@ -148,7 +150,13 @@ function BatchCard({
           {batch.slides.slice(0, expanded ? 50 : 8).map((slide) => (
             <div
               key={slide.id}
-              className="relative aspect-square overflow-hidden rounded-md border bg-muted"
+              role="button"
+              tabIndex={0}
+              onClick={() => setLightboxSlide(slide)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setLightboxSlide(slide);
+              }}
+              className="relative aspect-square cursor-zoom-in overflow-hidden rounded-md border bg-muted transition-opacity hover:opacity-90"
             >
               {slide.thumbnailUrl ? (
                 <Image
@@ -274,6 +282,19 @@ function BatchCard({
           </Button>
         </div>
       </CardContent>
+      <ImageLightbox
+        open={lightboxSlide !== null}
+        onOpenChange={(o) => {
+          if (!o) setLightboxSlide(null);
+        }}
+        src={lightboxSlide ? `/api/v1/slides/${lightboxSlide.id}/medium` : ""}
+        alt={lightboxSlide?.originalFilename}
+        downloadUrl={
+          lightboxSlide
+            ? `/api/v1/slides/${lightboxSlide.id}/original`
+            : undefined
+        }
+      />
     </Card>
   );
 }
