@@ -221,3 +221,39 @@
     @apply font-sans;
   }
 }
+
+/* --- Galleria "tavolo luminoso" (light table) --------------------------- */
+
+/* 35mm film sprocket-hole divider */
+.film-sprockets {
+  height: 14px;
+  background-image: radial-gradient(
+    4px 5px at 50% 50%,
+    color-mix(in oklab, var(--foreground) 28%, transparent) 97%,
+    transparent
+  );
+  background-size: 19px 14px;
+  background-position: left center;
+}
+
+/* Staggered card reveal on page load / page change */
+@keyframes slide-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.slide-reveal {
+  animation: slide-reveal 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-reveal {
+    animation: none;
+  }
+}

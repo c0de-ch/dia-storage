@@ -18,6 +18,11 @@ interface SlideCardProps {
   showCheckbox?: boolean;
 }
 
+/**
+ * A slide rendered as a physical 35mm mount: thick card frame, inset
+ * photo with inner shadow, frame number and date stamped in mono —
+ * like a Kodachrome mount on a light table.
+ */
 export const SlideCard = memo(function SlideCard({
   slide,
   selected = false,
@@ -30,6 +35,7 @@ export const SlideCard = memo(function SlideCard({
     slide.title || slide.originalFilename || `Diapositiva #${slide.id}`;
   const displayDate = slide.dateTaken || null;
   const displayLocation = slide.location || null;
+  const frameNumber = `#${String(slide.id).padStart(4, "0")}`;
 
   function handleClick(e: React.MouseEvent) {
     // Don't navigate if clicking the checkbox
@@ -51,32 +57,33 @@ export const SlideCard = memo(function SlideCard({
   return (
     <div
       className={cn(
-        "group/slide relative cursor-pointer overflow-hidden rounded-lg border bg-card transition-all hover:ring-2 hover:ring-ring/50",
-        selected && "ring-2 ring-primary"
+        "group/slide relative cursor-pointer rounded-sm border bg-card p-2 shadow-sm",
+        "transition-all duration-300 ease-out",
+        "hover:-translate-y-1 hover:shadow-lg hover:ring-2 hover:ring-ring/40",
+        selected && "-translate-y-1 ring-2 ring-primary shadow-lg"
       )}
       onClick={handleClick}
     >
       {/* Checkbox overlay */}
       <div
         className={cn(
-          "absolute top-2 left-2 z-10 transition-opacity",
-          showCheckbox || selected ? "opacity-100" : "opacity-0 group-hover/slide:opacity-100"
+          "absolute top-3.5 left-3.5 z-10 transition-opacity",
+          showCheckbox || selected
+            ? "opacity-100"
+            : "opacity-0 group-hover/slide:opacity-100"
         )}
       >
         <div
           className="rounded bg-background/80 p-1 backdrop-blur-sm"
           onClick={(e) => e.stopPropagation()}
         >
-          <Checkbox
-            checked={selected}
-            onCheckedChange={handleCheckboxChange}
-          />
+          <Checkbox checked={selected} onCheckedChange={handleCheckboxChange} />
         </div>
       </div>
 
       {/* Status badge */}
       {slide.status !== "active" && (
-        <div className="absolute top-2 right-2 z-10">
+        <div className="absolute top-3.5 right-3.5 z-10">
           <Badge variant={statusBadgeVariant}>
             {slide.status === "incoming"
               ? t("status.incoming")
@@ -87,24 +94,25 @@ export const SlideCard = memo(function SlideCard({
         </div>
       )}
 
-      {/* Thumbnail */}
+      {/* Photo, inset in the mount */}
       <ThumbnailImage slideId={slide.id} alt={displayTitle} />
 
-
-      {/* Info below thumbnail */}
-      <div className="space-y-0.5 px-2 py-1.5">
-        {displayDate && (
-          <p className="truncate text-xs text-muted-foreground">
-            {displayDate}
+      {/* Mount stampings */}
+      <div className="px-0.5 pt-1.5 pb-0.5">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="min-w-0 truncate text-xs font-semibold leading-tight">
+            {displayTitle}
           </p>
-        )}
-        {displayLocation && (
-          <p className="truncate text-xs text-muted-foreground">
-            {displayLocation}
+          <span className="shrink-0 font-mono text-[10px] tracking-wider text-muted-foreground/70">
+            {frameNumber}
+          </span>
+        </div>
+        {(displayDate || displayLocation) ? (
+          <p className="truncate font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+            {[displayDate, displayLocation].filter(Boolean).join(" · ")}
           </p>
-        )}
-        {!displayDate && !displayLocation && (
-          <p className="text-xs text-muted-foreground/50 italic">
+        ) : (
+          <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/50">
             {t("gallery.noDetails")}
           </p>
         )}
@@ -117,7 +125,7 @@ function ThumbnailImage({ slideId, alt }: { slideId: number; alt: string }) {
   const [failed, setFailed] = useState(false);
 
   return (
-    <div className="relative aspect-[3/2] w-full overflow-hidden bg-muted">
+    <div className="relative aspect-[3/2] w-full overflow-hidden rounded-[3px] bg-muted">
       {failed ? (
         <div className="flex h-full w-full items-center justify-center">
           <ImageIcon className="size-8 text-muted-foreground" />
@@ -128,28 +136,27 @@ function ThumbnailImage({ slideId, alt }: { slideId: number; alt: string }) {
           alt={alt}
           fill
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
-          className="object-cover transition-transform group-hover/slide:scale-105"
+          className="object-cover transition-transform duration-500 ease-out group-hover/slide:scale-[1.04]"
           loading="lazy"
           onError={() => setFailed(true)}
         />
       )}
-      {/* Title overlay at bottom of image */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pb-1.5 pt-4">
-        <p className="truncate text-xs font-medium text-white">
-          {alt}
-        </p>
-      </div>
+      {/* Inner shadow of the mount window */}
+      <div
+        className="pointer-events-none absolute inset-0 rounded-[3px] shadow-[inset_0_0_10px_rgba(0,0,0,0.45)]"
+        aria-hidden
+      />
     </div>
   );
 }
 
 export function SlideCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <Skeleton className="aspect-[3/2] w-full rounded-none" />
-      <div className="space-y-1 px-2 py-1.5">
+    <div className="rounded-sm border bg-card p-2 shadow-sm">
+      <Skeleton className="aspect-[3/2] w-full rounded-[3px]" />
+      <div className="space-y-1 px-0.5 pt-1.5 pb-0.5">
         <Skeleton className="h-3 w-3/4" />
-        <Skeleton className="h-3 w-1/2" />
+        <Skeleton className="h-2.5 w-1/2" />
       </div>
     </div>
   );

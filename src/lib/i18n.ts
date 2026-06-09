@@ -215,6 +215,7 @@ const translations = {
   gallery: {
     title: "Galleria",
     subtitle: "Tutte le diapositive digitalizzate",
+    archiveLabel: "Archivio diapositive · 35 mm",
     allPhotos: "Tutte le foto",
     albums: "Album",
     filterByDate: "Filtra per data",
