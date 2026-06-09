@@ -230,6 +230,8 @@ const translations = {
     noSlidesHint: "Carica le prime diapositive per iniziare",
     slideCount: "{count} diapositive",
     slideCountSingular: "1 diapositiva",
+    slideUnitSingular: "diapositiva",
+    slideUnitPlural: "diapositive",
     viewGrid: "Visualizzazione griglia",
     viewList: "Visualizzazione elenco",
     viewDetail: "Visualizzazione dettaglio",

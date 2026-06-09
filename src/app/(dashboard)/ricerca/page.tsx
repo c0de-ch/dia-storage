@@ -310,7 +310,7 @@ export default function RicercaPage() {
 
           {/* Grid */}
           {loading ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5">
               {Array.from({ length: 15 }).map((_, i) => (
                 <SlideCardSkeleton key={i} />
               ))}
@@ -326,7 +326,7 @@ export default function RicercaPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5">
               {slides.map((slide) => (
                 <SlideCard key={slide.id} slide={slide} />
               ))}

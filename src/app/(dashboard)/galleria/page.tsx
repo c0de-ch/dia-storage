@@ -293,14 +293,18 @@ export default function GalleriaPage() {
           <h1 className="text-4xl font-black uppercase leading-none tracking-tight sm:text-5xl">
             {t("gallery.title")}
           </h1>
-          <div className="flex items-baseline gap-2">
-            <span className="font-mono text-2xl font-bold leading-none tabular-nums text-primary sm:text-3xl">
-              {pagination ? String(pagination.total).padStart(4, "0") : "····"}
-            </span>
-            <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-              {pagination?.total === 1 ? "diapositiva" : "diapositive"}
-            </span>
-          </div>
+          {activeTab === "all" && (
+            <div className="flex items-baseline gap-2">
+              <span className="font-mono text-2xl font-bold leading-none tabular-nums text-primary sm:text-3xl">
+                {pagination ? String(pagination.total).padStart(4, "0") : "····"}
+              </span>
+              <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                {pagination?.total === 1
+                  ? t("gallery.slideUnitSingular")
+                  : t("gallery.slideUnitPlural")}
+              </span>
+            </div>
+          )}
         </div>
         <div className="film-sprockets mt-3" aria-hidden />
         <p className="mt-2 text-sm font-light text-muted-foreground">
