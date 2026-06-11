@@ -48,11 +48,13 @@ export async function POST(request: NextRequest) {
       .where(eq(schema.users.email, email))
       .limit(1);
 
-    if (!user) {
+    if (!user || !user.active) {
+      // Same response as an invalid code, so unknown/disabled accounts aren't
+      // distinguishable from a wrong OTP.
       await recordAuthAttempt(email, 'verify', false, ipAddress);
       return NextResponse.json(
-        { success: false, message: 'Utente non trovato.' },
-        { status: 404 }
+        { success: false, message: 'Codice OTP non valido o scaduto.' },
+        { status: 401 }
       );
     }
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { canEditSlide } from '@/lib/auth/permissions';
 import { inArray } from 'drizzle-orm';
 
 export const POST = withAuth(async (request: NextRequest) => {
@@ -12,6 +13,14 @@ export const POST = withAuth(async (request: NextRequest) => {
     if (!slideIds || !Array.isArray(slideIds) || slideIds.length === 0) {
       return NextResponse.json(
         { success: false, message: 'Lista di ID diapositive obbligatoria.' },
+        { status: 400 }
+      );
+    }
+
+    // Only accept a bounded list of numeric ids.
+    if (slideIds.length > 500 || !slideIds.every((v) => Number.isInteger(v))) {
+      return NextResponse.json(
+        { success: false, message: 'Elenco di ID non valido.' },
         { status: 400 }
       );
     }
@@ -32,6 +41,18 @@ export const POST = withAuth(async (request: NextRequest) => {
       return NextResponse.json(
         { success: false, message: 'Nessuna diapositiva trovata con gli ID forniti.' },
         { status: 404 }
+      );
+    }
+
+    // Reject the whole batch unless the user may edit every targeted slide.
+    const user = (request as AuthenticatedRequest).user;
+    const forbidden = existingSlides.some(
+      (s) => !canEditSlide(user, s.uploadedBy ?? undefined)
+    );
+    if (forbidden) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per modificare una o più diapositive selezionate.' },
+        { status: 403 }
       );
     }
 

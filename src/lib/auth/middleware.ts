@@ -22,12 +22,43 @@ export type AuthenticatedHandler = (
   context?: Record<string, unknown>
 ) => Promise<Response>;
 
+const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * CSRF defence for cookie-authenticated routes: the session cookie is
+ * sameSite=lax, which still rides along on top-level cross-site form posts.
+ * Browsers always attach an Origin header on state-changing requests, so if
+ * one is present it must match the request's own host. Requests without an
+ * Origin (non-browser API clients, which are not subject to ambient-cookie
+ * CSRF) are allowed through. API-key routes (withApiKey) are unaffected.
+ */
+function isCsrfRejected(req: NextRequest): boolean {
+  if (!UNSAFE_METHODS.has(req.method)) return false;
+  const origin = req.headers.get("origin");
+  if (!origin) return false; // no ambient-cookie CSRF without an Origin
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    return true; // malformed Origin → reject
+  }
+  const host = req.headers.get("host") ?? req.nextUrl.host;
+  return originHost !== host;
+}
+
 /**
  * Wrap an API route handler to require authentication via session cookie.
  * Injects `req.user` with the authenticated user.
  */
 export function withAuth(handler: AuthenticatedHandler): RouteHandler {
   return async (req: NextRequest, context?: Record<string, unknown>) => {
+    if (isCsrfRejected(req)) {
+      return NextResponse.json(
+        { error: t("errors.csrf") },
+        { status: 403 }
+      );
+    }
+
     const user = await getSessionFromCookies();
 
     if (!user) {

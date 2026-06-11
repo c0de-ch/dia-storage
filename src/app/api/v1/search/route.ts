@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { slideVisibilityCondition } from '@/lib/auth/visibility';
 import { and, or, ilike, gte, lte, eq, desc, count, sql } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {
@@ -16,6 +17,11 @@ export const GET = withAuth(async (request: NextRequest) => {
     const offset = (page - 1) * limit;
 
     const conditions = [];
+
+    // Scope to slides the requesting user may see (own uploads; admins/editors
+    // see all).
+    const visibility = slideVisibilityCondition((request as AuthenticatedRequest).user);
+    if (visibility) conditions.push(visibility);
 
     // Exclude deleted slides from search
     conditions.push(sql`${schema.slides.status} != 'deleted'`);

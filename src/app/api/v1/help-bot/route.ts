@@ -5,6 +5,7 @@ import { settings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { withAuth } from "@/lib/auth/middleware";
 import { apiError } from "@/lib/api/errors";
+import { isAllowedServiceUrl } from "@/lib/security/net";
 
 // Approximate cost per 1M tokens (USD) — conservative estimates
 const COST_PER_1M_INPUT: Record<string, number> = {
@@ -135,18 +136,26 @@ export const POST = withAuth(async (request: NextRequest) => {
     if (!message || typeof message !== "string") {
       return apiError(400, "Messaggio mancante.");
     }
+    // Bound input so a single request can't ship megabytes of text to the LLM
+    // and blow past the monthly spending cap in one shot.
+    if (message.length > 4000) {
+      return apiError(400, "Messaggio troppo lungo.");
+    }
 
     // Check provider FIRST — Ollama doesn't need an API key or spending cap
     const provider = await getSetting("aiProvider") ?? "anthropic";
     const monthKey = currentMonthKey();
     const requestsKey = `aiRequests_${monthKey}`;
 
-    // Build conversation history
+    // Build conversation history — keep the last 10 turns, each length-capped.
     const chatHistory: Array<{ role: string; text: string }> = [];
     if (Array.isArray(history)) {
       for (const msg of history.slice(-10)) {
-        if (msg.role === "user" || msg.role === "assistant") {
-          chatHistory.push(msg);
+        if (
+          (msg.role === "user" || msg.role === "assistant") &&
+          typeof msg.text === "string"
+        ) {
+          chatHistory.push({ role: msg.role, text: msg.text.slice(0, 4000) });
         }
       }
     }
@@ -155,6 +164,10 @@ export const POST = withAuth(async (request: NextRequest) => {
       // ---- Ollama (local model) ----
       const ollamaUrl = (await getSetting("ollamaUrl")) ?? "http://localhost:11434";
       const ollamaModel = (await getSetting("ollamaModel")) ?? "llama3.2";
+
+      if (!isAllowedServiceUrl(ollamaUrl)) {
+        return apiError(400, "URL del server Ollama non consentito.", "OLLAMA_URL_BLOCKED");
+      }
 
       const ollamaMessages = [
         { role: "system", content: getSystemPrompt(lang) },

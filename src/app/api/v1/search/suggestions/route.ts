@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { slideVisibilityCondition } from '@/lib/auth/visibility';
 import { and, ne, isNotNull, desc, count, sql } from 'drizzle-orm';
 
 /**
@@ -11,9 +12,11 @@ import { and, ne, isNotNull, desc, count, sql } from 'drizzle-orm';
  * - years: 4-digit years extracted from the free-text `dateTaken` field
  *   (applied as a plain `q` search, which matches dateTaken via ilike)
  */
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (request) => {
   try {
     const yearExpr = sql<string>`substring(${schema.slides.dateTaken} from '((19|20)[0-9]{2})')`;
+    // Scope suggestions to the requesting user's own slides (admins/editors: all).
+    const visibility = slideVisibilityCondition((request as AuthenticatedRequest).user);
 
     const [locationRows, yearRows] = await Promise.all([
       db
@@ -23,7 +26,8 @@ export const GET = withAuth(async () => {
           and(
             ne(schema.slides.status, 'deleted'),
             isNotNull(schema.slides.location),
-            ne(schema.slides.location, '')
+            ne(schema.slides.location, ''),
+            ...(visibility ? [visibility] : [])
           )
         )
         .groupBy(schema.slides.location)
@@ -35,7 +39,8 @@ export const GET = withAuth(async () => {
         .where(
           and(
             ne(schema.slides.status, 'deleted'),
-            isNotNull(schema.slides.dateTaken)
+            isNotNull(schema.slides.dateTaken),
+            ...(visibility ? [visibility] : [])
           )
         )
         .groupBy(yearExpr)

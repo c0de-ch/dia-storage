@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { canViewSlide } from '@/lib/auth/permissions';
 import { parseIdParam } from '@/lib/api/params';
 import { eq } from 'drizzle-orm';
 import { readFile, writeFile, mkdir, access } from 'fs/promises';
 import sharp from 'sharp';
 import path from 'path';
 import { readImageBuffer } from '@/lib/images/heic';
+import { MAX_INPUT_PIXELS } from '@/lib/images/limits';
 
 const UPLOAD_DIR = process.env.STORAGE_PATH || './storage';
 
@@ -31,6 +33,15 @@ export const GET = withAuth(async (request: NextRequest, context) => {
       );
     }
 
+    const user = (request as AuthenticatedRequest).user;
+    if (!canViewSlide(user, slide.uploadedBy ?? undefined)) {
+      // 404 (not 403) so ids of other users' slides aren't confirmable.
+      return NextResponse.json(
+        { success: false, message: 'Diapositiva non trovata.' },
+        { status: 404 }
+      );
+    }
+
     // If thumbnail exists on disk, serve it
     if (slide.thumbnailPath) {
       try {
@@ -41,7 +52,7 @@ export const GET = withAuth(async (request: NextRequest, context) => {
             'Content-Type': 'image/jpeg',
             'Content-Disposition': 'inline; filename="thumbnail.jpg"',
             'Content-Length': fileBuffer.length.toString(),
-            'Cache-Control': 'public, max-age=604800',
+            'Cache-Control': 'private, max-age=604800',
           },
         });
       } catch {
@@ -59,7 +70,7 @@ export const GET = withAuth(async (request: NextRequest, context) => {
 
     try {
       const originalBuffer = await readImageBuffer(slide.storagePath);
-      const thumbnailBuffer = await sharp(originalBuffer)
+      const thumbnailBuffer = await sharp(originalBuffer, { limitInputPixels: MAX_INPUT_PIXELS })
         .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 80 })
         .toBuffer();
@@ -82,7 +93,7 @@ export const GET = withAuth(async (request: NextRequest, context) => {
           'Content-Type': 'image/jpeg',
           'Content-Disposition': 'inline; filename="thumbnail.jpg"',
           'Content-Length': thumbnailBuffer.length.toString(),
-          'Cache-Control': 'public, max-age=604800',
+          'Cache-Control': 'private, max-age=604800',
         },
       });
     } catch (err) {

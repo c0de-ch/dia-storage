@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { apiKeys, users } from '@/lib/db/schema';
+import { hashApiKey } from '@/lib/auth/api-key';
 import { sql, eq } from 'drizzle-orm';
 
 const APP_VERSION = process.env.APP_VERSION || '0.1.0';
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
         .select({ id: apiKeys.id })
         .from(apiKeys)
         .innerJoin(users, eq(apiKeys.userId, users.id))
-        .where(eq(apiKeys.key, apiKeyHeader))
+        .where(eq(apiKeys.key, hashApiKey(apiKeyHeader)))
         .limit(1);
 
       if (rows.length === 0) {

@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { canViewSlide } from '@/lib/auth/permissions';
 import { parseIdParam } from '@/lib/api/params';
 import { eq } from 'drizzle-orm';
 import { readFile, access } from 'fs/promises';
 import { readImageBuffer } from '@/lib/images/heic';
+import { isAllowedServiceUrl } from '@/lib/security/net';
+
+// Cap the image we send to a vision model. Generated medium/thumbnail are well
+// under this; guards against shipping a huge original and an outsized LLM bill.
+const MAX_DESCRIBE_IMAGE_BYTES = 12 * 1024 * 1024;
 
 async function getSetting(key: string): Promise<string | null> {
   const [row] = await db
@@ -38,6 +44,14 @@ export const POST = withAuth(async (request: NextRequest, context) => {
       );
     }
 
+    const user = (request as AuthenticatedRequest).user;
+    if (!canViewSlide(user, slide.uploadedBy ?? undefined)) {
+      return NextResponse.json(
+        { success: false, message: 'Diapositiva non trovata.' },
+        { status: 404 }
+      );
+    }
+
     // Get image as base64 — prefer medium, fall back to thumbnail, then original
     let imageBuffer: Buffer | null = null;
     for (const imgPath of [slide.mediumPath, slide.thumbnailPath, slide.storagePath]) {
@@ -63,6 +77,13 @@ export const POST = withAuth(async (request: NextRequest, context) => {
       );
     }
 
+    if (imageBuffer.length > MAX_DESCRIBE_IMAGE_BYTES) {
+      return NextResponse.json(
+        { success: false, message: 'Immagine troppo grande per la descrizione automatica.' },
+        { status: 413 }
+      );
+    }
+
     const base64Image = imageBuffer.toString('base64');
 
     // Check AI provider
@@ -82,6 +103,14 @@ export const POST = withAuth(async (request: NextRequest, context) => {
     const prompt = langPrompts[lang] ?? langPrompts['it-IT']!;
 
     if (provider === 'ollama') {
+      // Block SSRF: ollamaUrl is an admin setting and may legitimately be a
+      // local service, but reject non-http(s) and the cloud-metadata endpoint.
+      if (!isAllowedServiceUrl(ollamaUrl)) {
+        return NextResponse.json(
+          { success: false, message: 'URL del server Ollama non consentito.' },
+          { status: 400 }
+        );
+      }
       const res = await fetch(`${ollamaUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

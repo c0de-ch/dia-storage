@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
-import { count, desc } from 'drizzle-orm';
+import { canViewAllSlides } from '@/lib/auth/permissions';
+import { count, desc, eq } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {
   try {
@@ -11,12 +12,22 @@ export const GET = withAuth(async (request: NextRequest) => {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '50')));
     const offset = (page - 1) * limit;
 
-    const [totalResult] = await db.select({ total: count() }).from(schema.collections);
+    // Scope albums to the user's own (admins/editors: all).
+    const user = (request as AuthenticatedRequest).user;
+    const scope = canViewAllSlides(user)
+      ? undefined
+      : eq(schema.collections.ownerUserId, user.id);
+
+    const [totalResult] = await db
+      .select({ total: count() })
+      .from(schema.collections)
+      .where(scope);
     const total = totalResult?.total ?? 0;
 
     const collections = await db
       .select()
       .from(schema.collections)
+      .where(scope)
       .orderBy(desc(schema.collections.createdAt))
       .limit(limit)
       .offset(offset);

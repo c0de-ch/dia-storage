@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
-import { canEditCollection, canDeleteCollection } from '@/lib/auth/permissions';
+import { canEditCollection, canDeleteCollection, canViewAllSlides } from '@/lib/auth/permissions';
 import { parseIdParam } from '@/lib/api/params';
 import { parseJsonBody, collectionPatchSchema } from '@/lib/api/validation';
 import { eq, and, ne, inArray } from 'drizzle-orm';
@@ -21,6 +21,17 @@ export const GET = withAuth(async (request: NextRequest, context) => {
       .limit(1);
 
     if (!collection) {
+      return NextResponse.json(
+        { success: false, message: 'Collezione non trovata.' },
+        { status: 404 }
+      );
+    }
+
+    const viewer = (request as AuthenticatedRequest).user;
+    if (
+      !canViewAllSlides(viewer) &&
+      collection.ownerUserId !== viewer.id
+    ) {
       return NextResponse.json(
         { success: false, message: 'Collezione non trovata.' },
         { status: 404 }

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
-import { count, desc } from 'drizzle-orm';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { canViewAllSlides } from '@/lib/auth/permissions';
+import { count, desc, eq } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {
   try {
@@ -11,12 +12,22 @@ export const GET = withAuth(async (request: NextRequest) => {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '50')));
     const offset = (page - 1) * limit;
 
-    const [totalResult] = await db.select({ total: count() }).from(schema.magazines);
+    // Scope magazines to the user's own (admins/editors: all).
+    const user = (request as AuthenticatedRequest).user;
+    const scope = canViewAllSlides(user)
+      ? undefined
+      : eq(schema.magazines.ownerUserId, user.id);
+
+    const [totalResult] = await db
+      .select({ total: count() })
+      .from(schema.magazines)
+      .where(scope);
     const total = totalResult?.total ?? 0;
 
     const magazines = await db
       .select()
       .from(schema.magazines)
+      .where(scope)
       .orderBy(desc(schema.magazines.createdAt))
       .limit(limit)
       .offset(offset);
@@ -42,6 +53,7 @@ export const GET = withAuth(async (request: NextRequest) => {
 
 export const POST = withAuth(async (request: NextRequest) => {
   try {
+    const user = (request as AuthenticatedRequest).user;
     const body = await request.json();
     const { name, description, slotCount } = body;
 
@@ -58,6 +70,7 @@ export const POST = withAuth(async (request: NextRequest) => {
         name,
         description: description || null,
         slotCount: slotCount || 50,
+        ownerUserId: user.id,
       })
       .returning();
 

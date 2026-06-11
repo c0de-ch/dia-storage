@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAdmin } from '@/lib/auth/middleware';
+import { isAllowedServiceUrl } from '@/lib/security/net';
 
 export const POST = withAdmin(async (request: NextRequest) => {
   try {
@@ -9,6 +10,13 @@ export const POST = withAdmin(async (request: NextRequest) => {
     if (!ollamaUrl) {
       return NextResponse.json(
         { success: false, models: [], message: 'URL del server Ollama obbligatorio.' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof ollamaUrl !== 'string' || !isAllowedServiceUrl(ollamaUrl)) {
+      return NextResponse.json(
+        { success: false, models: [], message: 'URL del server Ollama non consentito (http/https).' },
         { status: 400 }
       );
     }

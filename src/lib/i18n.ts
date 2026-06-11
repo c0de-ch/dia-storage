@@ -618,6 +618,7 @@ const translations = {
     accountDisabled: "Il tuo account è stato disattivato",
     apiKeyRequired: "Chiave API richiesta",
     invalidApiKey: "Chiave API non valida",
+    csrf: "Origine della richiesta non valida.",
     invalidEmail: "Indirizzo email non valido",
     invalidPhone: "Numero di telefono non valido",
     invalidOtp: "Codice OTP non valido o scaduto",

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { canEditSlide } from '@/lib/auth/permissions';
 import { eq, and, inArray } from 'drizzle-orm';
 
 export const POST = withAuth(async (request: NextRequest) => {
@@ -30,6 +31,15 @@ export const POST = withAuth(async (request: NextRequest) => {
       return NextResponse.json(
         { success: false, message: 'Nessuna diapositiva in arrivo trovata per questo batch.' },
         { status: 404 }
+      );
+    }
+
+    // Reject unless the user may edit every slide in the batch.
+    const requester = (request as AuthenticatedRequest).user;
+    if (slides.some((s) => !canEditSlide(requester, s.uploadedBy ?? undefined))) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per archiviare una o più diapositive del batch.' },
+        { status: 403 }
       );
     }
 

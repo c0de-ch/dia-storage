@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAdmin } from '@/lib/auth/middleware';
+import { isSafeOutboundUrl } from '@/lib/security/net';
 
 export const POST = withAdmin(async (request: NextRequest) => {
   try {
@@ -27,6 +28,13 @@ export const POST = withAdmin(async (request: NextRequest) => {
     if (!whatsappApiUrl || !whatsappApiKey) {
       return NextResponse.json(
         { success: false, message: 'Configurazione WhatsApp non completa. Impostare URL API e chiave API.' },
+        { status: 400 }
+      );
+    }
+
+    if (!isSafeOutboundUrl(whatsappApiUrl)) {
+      return NextResponse.json(
+        { success: false, message: "URL dell'API WhatsApp non consentito (usa un indirizzo pubblico http/https)." },
         { status: 400 }
       );
     }

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { canEditCollection, canViewSlide } from '@/lib/auth/permissions';
 import { parseIdParam } from '@/lib/api/params';
 import { eq, and, inArray } from 'drizzle-orm';
 
@@ -34,14 +35,27 @@ export const POST = withAuth(async (request: NextRequest, context) => {
       );
     }
 
+    const user = (request as AuthenticatedRequest).user;
+    if (!canEditCollection(user, collection.ownerUserId ?? undefined)) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per modificare questa collezione.' },
+        { status: 403 }
+      );
+    }
+
     const numericSlideIds = slideIds.map(Number);
 
-    // Batch-check which slides actually exist
+    // Only link slides the user is actually allowed to see — otherwise an album
+    // could be used to surface another user's slides via the collection GET.
     const existingSlides = await db
-      .select({ id: schema.slides.id })
+      .select({ id: schema.slides.id, uploadedBy: schema.slides.uploadedBy })
       .from(schema.slides)
       .where(inArray(schema.slides.id, numericSlideIds));
-    const validIds = new Set(existingSlides.map((s) => s.id));
+    const validIds = new Set(
+      existingSlides
+        .filter((s) => canViewSlide(user, s.uploadedBy ?? undefined))
+        .map((s) => s.id)
+    );
 
     // Batch-check which associations already exist
     const existingAssocs = await db
@@ -121,6 +135,14 @@ export const DELETE = withAuth(async (request: NextRequest, context) => {
       return NextResponse.json(
         { success: false, message: 'Collezione non trovata.' },
         { status: 404 }
+      );
+    }
+
+    const user = (request as AuthenticatedRequest).user;
+    if (!canEditCollection(user, collection.ownerUserId ?? undefined)) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per modificare questa collezione.' },
+        { status: 403 }
       );
     }
 
