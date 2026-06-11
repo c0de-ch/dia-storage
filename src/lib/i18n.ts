@@ -325,6 +325,7 @@ const translations = {
     subtitle: "Cerca tra le tue diapositive",
     placeholder: "Cerca per titolo, luogo, note...",
     advancedSearch: "Ricerca avanzata",
+    suggestions: "Suggerimenti:",
     searchResults: "Risultati della ricerca",
     subtitleLong: "Cerca tra tutte le diapositive archiviate",
     searching: "Ricerca...",

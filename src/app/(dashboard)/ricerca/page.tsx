@@ -43,24 +43,25 @@ interface Magazine {
   name: string;
 }
 
-const QUICK_SUGGESTIONS = [
-  "Roma",
-  "Milano",
-  "Firenze",
-  "Napoli",
-  "Venezia",
-  "1970",
-  "1975",
-  "1980",
-  "1985",
-  "1990",
-];
+interface SearchSuggestions {
+  locations: string[];
+  years: string[];
+}
 
 export default function RicercaPage() {
   const searchParams = useSearchParams();
 
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // ?avanzata=1 deep-links with the advanced panel open (e.g. from the
+  // "Caricatori" stat card on the dashboard)
+  const [advancedOpen, setAdvancedOpen] = useState(
+    searchParams.get("avanzata") === "1"
+  );
+  // Suggestions derived from the archive (top locations and years), so
+  // every chip is guaranteed to return results.
+  const [suggestions, setSuggestions] = useState<SearchSuggestions | null>(
+    null
+  );
 
   // Advanced filters
   const [titleFilter, setTitleFilter] = useState("");
@@ -83,6 +84,21 @@ export default function RicercaPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.success && data.magazines) setMagazines(data.magazines);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch data-driven suggestions
+  useEffect(() => {
+    fetch("/api/v1/search/suggestions")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) {
+          setSuggestions({
+            locations: data.locations ?? [],
+            years: data.years ?? [],
+          });
+        }
       })
       .catch(() => {});
   }, []);
@@ -198,24 +214,36 @@ export default function RicercaPage() {
         </Button>
       </div>
 
-      {/* Quick suggestions */}
-      {!searched && (
-        <div className="flex flex-wrap gap-1.5">
-          <span className="text-xs text-muted-foreground self-center mr-1">
-            Suggerimenti:
-          </span>
-          {QUICK_SUGGESTIONS.map((s) => (
-            <Badge
-              key={s}
-              variant="secondary"
-              className="cursor-pointer hover:bg-secondary/80"
-              onClick={() => handleSuggestionClick(s)}
-            >
-              {s}
-            </Badge>
-          ))}
-        </div>
-      )}
+      {/* Quick suggestions (top locations and years from the archive) */}
+      {!searched &&
+        suggestions &&
+        (suggestions.locations.length > 0 || suggestions.years.length > 0) && (
+          <div className="flex flex-wrap gap-1.5">
+            <span className="text-xs text-muted-foreground self-center mr-1">
+              {t("search.suggestions")}
+            </span>
+            {suggestions.locations.map((s) => (
+              <Badge
+                key={`loc-${s}`}
+                variant="secondary"
+                className="cursor-pointer hover:bg-secondary/80"
+                onClick={() => handleSuggestionClick(s)}
+              >
+                {s}
+              </Badge>
+            ))}
+            {suggestions.years.map((s) => (
+              <Badge
+                key={`year-${s}`}
+                variant="outline"
+                className="cursor-pointer hover:bg-secondary/80"
+                onClick={() => handleSuggestionClick(s)}
+              >
+                {s}
+              </Badge>
+            ))}
+          </div>
+        )}
 
       {/* Advanced search */}
       <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>

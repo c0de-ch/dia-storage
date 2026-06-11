@@ -26,7 +26,9 @@ export const GET = withAuth(async (request: NextRequest) => {
           ilike(schema.slides.title, `%${q}%`),
           ilike(schema.slides.location, `%${q}%`),
           ilike(schema.slides.notes, `%${q}%`),
-          ilike(schema.slides.originalFilename, `%${q}%`)
+          ilike(schema.slides.originalFilename, `%${q}%`),
+          // Free-text date ("giugno 1985") so year queries find slides
+          ilike(schema.slides.dateTaken, `%${q}%`)
         )
       );
     }
