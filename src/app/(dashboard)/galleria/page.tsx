@@ -14,6 +14,7 @@ import {
   LibraryIcon,
   Loader2Icon,
   MapPinIcon,
+  UsersIcon,
   XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -68,6 +69,7 @@ interface Collection {
   description?: string;
   coverSlideId?: number;
   slidesCount?: number;
+  shared?: boolean;
 }
 
 export default function GalleriaPage() {
@@ -647,6 +649,12 @@ function AlbumCard({ collection }: { collection: Collection }) {
     <Link href={`/album/${collection.id}`}>
       <Card className="group cursor-pointer overflow-hidden transition-all hover:ring-2 hover:ring-ring/50">
         <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+          {collection.shared && (
+            <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 rounded-full bg-background/85 px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm">
+              <UsersIcon className="size-3" />
+              Condiviso
+            </span>
+          )}
           {coverUrl ? (
             <Image
               src={coverUrl}

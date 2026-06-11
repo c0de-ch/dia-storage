@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canViewSlide } from '@/lib/auth/permissions';
+import { slideSharedWithUser } from '@/lib/auth/sharing';
 import { parseIdParam } from '@/lib/api/params';
 import { eq } from 'drizzle-orm';
 import { readFile } from 'fs/promises';
@@ -29,7 +30,10 @@ export const GET = withAuth(async (request: NextRequest, context) => {
     }
 
     const user = (request as AuthenticatedRequest).user;
-    if (!canViewSlide(user, slide.uploadedBy ?? undefined)) {
+    if (
+      !canViewSlide(user, slide.uploadedBy ?? undefined) &&
+      !(await slideSharedWithUser(slide.id, user.id))
+    ) {
       return NextResponse.json(
         { success: false, message: 'Diapositiva non trovata.' },
         { status: 404 }
