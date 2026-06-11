@@ -275,6 +275,51 @@ export const slideCollectionsRelations = relations(
 );
 
 // ---------------------------------------------------------------------------
+// Collection shares — grants another registered user read-only access to an
+// album (collection) and the slides it contains.
+// ---------------------------------------------------------------------------
+export const collectionShares = pgTable(
+  "collection_shares",
+  {
+    id: serial("id").primaryKey(),
+    collectionId: integer("collection_id")
+      .notNull()
+      .references(() => collections.id, { onDelete: "cascade" }),
+    sharedWithUserId: integer("shared_with_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sharedByUserId: integer("shared_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("collection_shares_unique").on(
+      table.collectionId,
+      table.sharedWithUserId
+    ),
+    index("collection_shares_user_idx").on(table.sharedWithUserId),
+    index("collection_shares_collection_idx").on(table.collectionId),
+  ]
+);
+
+export const collectionSharesRelations = relations(
+  collectionShares,
+  ({ one }) => ({
+    collection: one(collections, {
+      fields: [collectionShares.collectionId],
+      references: [collections.id],
+    }),
+    sharedWith: one(users, {
+      fields: [collectionShares.sharedWithUserId],
+      references: [users.id],
+    }),
+  })
+);
+
+// ---------------------------------------------------------------------------
 // Backup History
 // ---------------------------------------------------------------------------
 export const backupHistory = pgTable(

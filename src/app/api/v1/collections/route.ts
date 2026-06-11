@@ -3,7 +3,8 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canViewAllSlides } from '@/lib/auth/permissions';
-import { count, desc, eq } from 'drizzle-orm';
+import { collectionIdsSharedWith } from '@/lib/auth/sharing';
+import { count, desc, eq, or, inArray } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {
   try {
@@ -12,11 +13,18 @@ export const GET = withAuth(async (request: NextRequest) => {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '50')));
     const offset = (page - 1) * limit;
 
-    // Scope albums to the user's own (admins/editors: all).
+    // Albums the user owns (admins/editors: all) PLUS albums shared with them.
     const user = (request as AuthenticatedRequest).user;
-    const scope = canViewAllSlides(user)
+    const seeAll = canViewAllSlides(user);
+    const sharedIds = seeAll ? [] : await collectionIdsSharedWith(user.id);
+    const scope = seeAll
       ? undefined
-      : eq(schema.collections.ownerUserId, user.id);
+      : sharedIds.length > 0
+        ? or(
+            eq(schema.collections.ownerUserId, user.id),
+            inArray(schema.collections.id, sharedIds)
+          )
+        : eq(schema.collections.ownerUserId, user.id);
 
     const [totalResult] = await db
       .select({ total: count() })
@@ -24,13 +32,20 @@ export const GET = withAuth(async (request: NextRequest) => {
       .where(scope);
     const total = totalResult?.total ?? 0;
 
-    const collections = await db
+    const rows = await db
       .select()
       .from(schema.collections)
       .where(scope)
       .orderBy(desc(schema.collections.createdAt))
       .limit(limit)
       .offset(offset);
+
+    // Flag albums that are shown because they were shared with the user.
+    const sharedSet = new Set(sharedIds);
+    const collections = rows.map((c) => ({
+      ...c,
+      shared: !seeAll && c.ownerUserId !== user.id && sharedSet.has(c.id),
+    }));
 
     return NextResponse.json({
       success: true,

@@ -26,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   ArrowLeftIcon,
   FolderInputIcon,
@@ -34,7 +35,10 @@ import {
   Loader2Icon,
   PencilIcon,
   PlusIcon,
+  Share2Icon,
   Trash2Icon,
+  UsersIcon,
+  XIcon,
 } from "lucide-react";
 import type { Slide } from "@/types/slide";
 
@@ -44,6 +48,15 @@ interface Album {
   description: string | null;
   coverSlideId: number | null;
   slides?: Slide[];
+  // "owner" = the user owns / can manage this album; "shared" = it was shared
+  // with them (read-only). Set by GET /api/v1/collections/[id].
+  access?: "owner" | "shared";
+}
+
+interface ShareEntry {
+  userId: number;
+  email: string;
+  name: string | null;
 }
 
 export default function AlbumDetailPage() {
@@ -63,6 +76,14 @@ export default function AlbumDetailPage() {
   const [addSelected, setAddSelected] = useState<Set<number>>(new Set());
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [adding, setAdding] = useState(false);
+
+  // Sharing
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shares, setShares] = useState<ShareEntry[]>([]);
+  const [shareEmail, setShareEmail] = useState("");
+  const [sharing, setSharing] = useState(false);
+
+  const canManage = album?.access !== "shared";
 
   const load = useCallback(async () => {
     try {
@@ -208,6 +229,66 @@ export default function AlbumDetailPage() {
     load();
   }
 
+  async function openShare() {
+    setShareOpen(true);
+    setShareEmail("");
+    try {
+      const res = await fetch(`/api/v1/collections/${albumId}/shares`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setShares(data.shares ?? []);
+      }
+    } catch {
+      setShares([]);
+    }
+  }
+
+  async function addShare(e: React.FormEvent) {
+    e.preventDefault();
+    const email = shareEmail.trim().toLowerCase();
+    if (!email) return;
+    setSharing(true);
+    try {
+      const res = await fetch(`/api/v1/collections/${albumId}/shares`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        // Avoid a duplicate row if the album was already shared with them.
+        setShares((prev) =>
+          prev.some((s) => s.userId === data.share.userId)
+            ? prev
+            : [...prev, data.share]
+        );
+        setShareEmail("");
+        toast.success(`Album condiviso con ${data.share.email}`);
+      } else {
+        toast.error(data.message ?? t("errors.generic"));
+      }
+    } catch {
+      toast.error(t("errors.generic"));
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  async function removeShare(userId: number) {
+    const res = await fetch(
+      `/api/v1/collections/${albumId}/shares?userId=${userId}`,
+      { method: "DELETE", credentials: "include" }
+    );
+    if (res.ok) {
+      setShares((prev) => prev.filter((s) => s.userId !== userId));
+    } else {
+      toast.error(t("errors.generic"));
+    }
+  }
+
   async function openAdd() {
     setAddOpen(true);
     setAddSelected(new Set());
@@ -306,39 +387,52 @@ export default function AlbumDetailPage() {
           </Button>
           <div className="flex items-center gap-1.5">
             <h1 className="text-2xl font-bold tracking-tight">{album.name}</h1>
-            <HelpPopover
-              items={[
-                "Clicca una foto per aprirla.",
-                "Spunta le foto, poi «Sposta in» per spostarle in un altro album o «Rimuovi».",
-                "Con una sola foto selezionata, «Imposta copertina» sceglie la miniatura.",
-                "«Aggiungi foto» inserisce altre diapositive nell'album.",
-              ]}
-            />
+            {canManage && (
+              <HelpPopover
+                items={[
+                  "Clicca una foto per aprirla.",
+                  "Spunta le foto, poi «Sposta in» per spostarle in un altro album o «Rimuovi».",
+                  "Con una sola foto selezionata, «Imposta copertina» sceglie la miniatura.",
+                  "«Aggiungi foto» inserisce altre diapositive nell'album.",
+                  "«Condividi» dà accesso in sola lettura a un altro utente registrato.",
+                ]}
+              />
+            )}
           </div>
-          <p className="text-sm text-muted-foreground">
-            {slides.length === 1
-              ? "1 foto"
-              : `${slides.length} foto`}
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            {slides.length === 1 ? "1 foto" : `${slides.length} foto`}
+            {!canManage && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                <UsersIcon className="size-3" />
+                Condiviso con te
+              </span>
+            )}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={openAdd}>
-            <PlusIcon />
-            Aggiungi foto
-          </Button>
-          <Button variant="outline" size="sm" onClick={rename}>
-            <PencilIcon />
-            Rinomina
-          </Button>
-          <Button variant="destructive" size="sm" onClick={deleteAlbum}>
-            <Trash2Icon />
-            {t("actions.delete")}
-          </Button>
-        </div>
+        {canManage && (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={openAdd}>
+              <PlusIcon />
+              Aggiungi foto
+            </Button>
+            <Button variant="outline" size="sm" onClick={openShare}>
+              <Share2Icon />
+              Condividi
+            </Button>
+            <Button variant="outline" size="sm" onClick={rename}>
+              <PencilIcon />
+              Rinomina
+            </Button>
+            <Button variant="destructive" size="sm" onClick={deleteAlbum}>
+              <Trash2Icon />
+              {t("actions.delete")}
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Selection toolbar */}
-      {slides.length > 0 && (
+      {/* Selection toolbar (owner only) */}
+      {canManage && slides.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
@@ -433,21 +527,23 @@ export default function AlbumDetailPage() {
                 selected.has(slide.id) && "ring-2 ring-primary"
               )}
             >
-              <div
-                className={cn(
-                  "absolute top-1.5 left-1.5 z-10 transition-opacity",
-                  selected.has(slide.id)
-                    ? "opacity-100"
-                    : "opacity-0 group-hover/thumb:opacity-100"
-                )}
-              >
-                <div className="rounded bg-background/80 p-0.5 backdrop-blur-sm">
-                  <Checkbox
-                    checked={selected.has(slide.id)}
-                    onCheckedChange={() => toggle(slide.id)}
-                  />
+              {canManage && (
+                <div
+                  className={cn(
+                    "absolute top-1.5 left-1.5 z-10 transition-opacity",
+                    selected.has(slide.id)
+                      ? "opacity-100"
+                      : "opacity-0 group-hover/thumb:opacity-100"
+                  )}
+                >
+                  <div className="rounded bg-background/80 p-0.5 backdrop-blur-sm">
+                    <Checkbox
+                      checked={selected.has(slide.id)}
+                      onCheckedChange={() => toggle(slide.id)}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
               {album.coverSlideId === slide.id && (
                 <span className="absolute top-1.5 right-1.5 z-10 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
                   Copertina
@@ -533,6 +629,67 @@ export default function AlbumDetailPage() {
               Aggiungi {addSelected.size > 0 ? `(${addSelected.size})` : ""}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share dialog */}
+      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Condividi &laquo;{album.name}&raquo;</DialogTitle>
+            <DialogDescription>
+              Inserisci l&apos;email di un utente registrato per dargli accesso
+              in sola lettura a questo album e alle sue foto.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={addShare} className="flex gap-2">
+            <Input
+              type="email"
+              placeholder="nome@esempio.com"
+              value={shareEmail}
+              onChange={(e) => setShareEmail(e.target.value)}
+              autoFocus
+            />
+            <Button type="submit" disabled={sharing || !shareEmail.trim()}>
+              {sharing ? <Loader2Icon className="animate-spin" /> : <Share2Icon />}
+              Condividi
+            </Button>
+          </form>
+
+          <div className="mt-2">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">
+              Condiviso con
+            </p>
+            {shares.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Non ancora condiviso con nessuno.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {shares.map((s) => (
+                  <li
+                    key={s.userId}
+                    className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm"
+                  >
+                    <span className="min-w-0 truncate">
+                      {s.name ? `${s.name} · ` : ""}
+                      {s.email}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 shrink-0"
+                      onClick={() => removeShare(s.userId)}
+                      aria-label={`Rimuovi ${s.email}`}
+                    >
+                      <XIcon className="size-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
