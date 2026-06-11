@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canEditSlide } from '@/lib/auth/permissions';
+import { canAssignMagazine } from '@/lib/api/magazine-guard';
 import { parseIdParam } from '@/lib/api/params';
 import { eq } from 'drizzle-orm';
 
@@ -43,6 +44,13 @@ export const POST = withAuth(async (request: NextRequest, context) => {
     }
 
     const { title, dateTaken, location, magazineId, slotNumber, notes } = body;
+
+    if (magazineId !== undefined && !(await canAssignMagazine(user, magazineId))) {
+      return NextResponse.json(
+        { success: false, message: 'Caricatore non valido o non consentito.' },
+        { status: 403 }
+      );
+    }
 
     const updateData: Record<string, unknown> = {
       status: 'active',

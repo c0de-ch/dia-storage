@@ -38,11 +38,12 @@ function isCsrfRejected(req: NextRequest): boolean {
   if (!origin) return false; // no ambient-cookie CSRF without an Origin
   let originHost: string;
   try {
-    originHost = new URL(origin).host;
+    originHost = new URL(origin).host.toLowerCase();
   } catch {
     return true; // malformed Origin → reject
   }
-  const host = req.headers.get("host") ?? req.nextUrl.host;
+  // Host header is case-insensitive; normalize both sides before comparing.
+  const host = (req.headers.get("host") ?? req.nextUrl.host).toLowerCase();
   return originHost !== host;
 }
 

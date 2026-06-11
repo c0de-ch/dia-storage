@@ -8,6 +8,12 @@
  * DNS-rebinding (a public name that resolves to 127.0.0.1). For a small
  * single-tenant deployment that is acceptable; if you ever expose these
  * settings to untrusted users, resolve the host and re-check the resolved IP.
+ *
+ * Node's URL parser already folds decimal/hex IPv4 (e.g. 2130706433,
+ * 0x7f000001) to dotted form, but it keeps IPv6 in bracketed, hex-compressed
+ * form (`[::ffff:7f00:1]`) and preserves a trailing-dot FQDN (`localhost.`).
+ * normalizeHost() + mappedIpv4() undo those so the range checks can't be
+ * bypassed by encoding.
  */
 
 const BLOCKED_HOSTNAMES = new Set([
@@ -16,10 +22,19 @@ const BLOCKED_HOSTNAMES = new Set([
   "ip6-loopback",
 ]);
 
+/** Lowercase, strip IPv6 brackets and a trailing FQDN dot. */
+function normalizeHost(hostname: string): string {
+  let h = hostname.toLowerCase();
+  if (h.startsWith("[") && h.endsWith("]")) h = h.slice(1, -1);
+  while (h.endsWith(".")) h = h.slice(0, -1);
+  return h;
+}
+
 function isPrivateOrLocalIpv4(host: string): boolean {
   const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (!m) return false;
   const [a, b] = [Number(m[1]), Number(m[2])];
+  if (a > 255 || b > 255) return false;
   if (a === 127) return true; // loopback
   if (a === 10) return true; // private
   if (a === 0) return true; // "this host"
@@ -30,14 +45,27 @@ function isPrivateOrLocalIpv4(host: string): boolean {
   return false;
 }
 
-function isLocalIpv6(host: string): boolean {
-  const h = host.replace(/^\[/, "").replace(/\]$/, "").toLowerCase();
+/**
+ * If `h` is an IPv4-mapped IPv6 address, return its dotted-quad IPv4 form,
+ * handling both the dotted (`::ffff:127.0.0.1`) and the hex-compressed
+ * (`::ffff:7f00:1`) representations Node produces. Otherwise null.
+ */
+function mappedIpv4(h: string): string | null {
+  const dotted = h.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (dotted && dotted[1]) return dotted[1];
+  const hex = h.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (hex && hex[1] && hex[2]) {
+    const hi = parseInt(hex[1], 16);
+    const lo = parseInt(hex[2], 16);
+    return `${(hi >> 8) & 255}.${hi & 255}.${(lo >> 8) & 255}.${lo & 255}`;
+  }
+  return null;
+}
+
+function isLocalIpv6(h: string): boolean {
   if (h === "::1" || h === "::") return true;
   if (h.startsWith("fe80:")) return true; // link-local
   if (h.startsWith("fc") || h.startsWith("fd")) return true; // unique local
-  // IPv4-mapped (::ffff:127.0.0.1)
-  const mapped = h.match(/::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
-  if (mapped && mapped[1]) return isPrivateOrLocalIpv4(mapped[1]);
   return false;
 }
 
@@ -51,14 +79,17 @@ export function isSafeOutboundUrl(raw: string): boolean {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return false;
 
-  const host = url.hostname.toLowerCase();
+  const host = normalizeHost(url.hostname);
   if (!host) return false;
   if (BLOCKED_HOSTNAMES.has(host)) return false;
   if (host.endsWith(".localhost") || host.endsWith(".local")) return false;
+
+  // IPv4-mapped IPv6 → check the embedded IPv4 against the private ranges.
+  const mapped = mappedIpv4(host);
+  if (mapped && isPrivateOrLocalIpv4(mapped)) return false;
+
   if (isPrivateOrLocalIpv4(host)) return false;
-  if (host.includes(":") || host.startsWith("[")) {
-    if (isLocalIpv6(host)) return false;
-  }
+  if ((host.includes(":") || mapped) && isLocalIpv6(host)) return false;
   return true;
 }
 
@@ -88,9 +119,12 @@ export function isAllowedServiceUrl(raw: string): boolean {
     return false;
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-  const host = url.hostname.toLowerCase();
+  const host = normalizeHost(url.hostname);
   if (!host) return false;
-  // Block cloud-metadata regardless (link-local 169.254.x.x).
+  // Block cloud-metadata regardless of encoding (link-local 169.254.x.x,
+  // including its IPv4-mapped IPv6 form).
   if (/^169\.254\./.test(host)) return false;
+  const mapped = mappedIpv4(host);
+  if (mapped && /^169\.254\./.test(mapped)) return false;
   return true;
 }

@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canEditSlide, canDeleteSlide, canViewSlide } from '@/lib/auth/permissions';
+import { canAssignMagazine } from '@/lib/api/magazine-guard';
 import { parseIdParam } from '@/lib/api/params';
 import { parseJsonBody, slidePatchSchema } from '@/lib/api/validation';
 import { eq } from 'drizzle-orm';
@@ -75,6 +76,16 @@ export const PATCH = withAuth(async (request: NextRequest, context) => {
     if (!canEditSlide(user, existingSlide.uploadedBy ?? undefined)) {
       return NextResponse.json(
         { success: false, message: 'Non hai i permessi per modificare questa diapositiva.' },
+        { status: 403 }
+      );
+    }
+
+    if (
+      parsedBody.data.magazineId !== undefined &&
+      !(await canAssignMagazine(user, parsedBody.data.magazineId))
+    ) {
+      return NextResponse.json(
+        { success: false, message: 'Caricatore non valido o non consentito.' },
         { status: 403 }
       );
     }

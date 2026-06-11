@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canEditSlide } from '@/lib/auth/permissions';
+import { canAssignMagazine } from '@/lib/api/magazine-guard';
 import { inArray } from 'drizzle-orm';
 
 export const POST = withAuth(async (request: NextRequest) => {
@@ -52,6 +53,16 @@ export const POST = withAuth(async (request: NextRequest) => {
     if (forbidden) {
       return NextResponse.json(
         { success: false, message: 'Non hai i permessi per modificare una o più diapositive selezionate.' },
+        { status: 403 }
+      );
+    }
+
+    if (
+      metadata.magazineId !== undefined &&
+      !(await canAssignMagazine(user, metadata.magazineId))
+    ) {
+      return NextResponse.json(
+        { success: false, message: 'Caricatore non valido o non consentito.' },
         { status: 403 }
       );
     }
