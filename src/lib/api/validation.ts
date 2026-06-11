@@ -74,6 +74,23 @@ export const slidePatchSchema = z
 export type SlidePatch = z.infer<typeof slidePatchSchema>;
 
 // ---------------------------------------------------------------------------
+// Slide EXIF write
+// ---------------------------------------------------------------------------
+const exifString = z.string().trim().max(255).optional();
+
+export const slideExifSchema = z
+  .object({
+    title: exifString,
+    dateTaken: exifString,
+    location: exifString,
+    author: exifString,
+    copyright: exifString,
+  })
+  .strict();
+
+export type SlideExif = z.infer<typeof slideExifSchema>;
+
+// ---------------------------------------------------------------------------
 // Collection PATCH
 // ---------------------------------------------------------------------------
 export const collectionPatchSchema = z

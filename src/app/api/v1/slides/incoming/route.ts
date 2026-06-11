@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
-import { eq, desc, count } from 'drizzle-orm';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { slideVisibilityCondition } from '@/lib/auth/visibility';
+import { and, eq, desc, count } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {
   try {
@@ -11,16 +12,22 @@ export const GET = withAuth(async (request: NextRequest) => {
     const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '100')));
     const offset = (page - 1) * limit;
 
+    // Scope the incoming queue to the user's own uploads (admins/editors: all).
+    const visibility = slideVisibilityCondition((request as AuthenticatedRequest).user);
+    const whereClause = visibility
+      ? and(eq(schema.slides.status, 'incoming'), visibility)
+      : eq(schema.slides.status, 'incoming');
+
     const [totalResult] = await db
       .select({ total: count() })
       .from(schema.slides)
-      .where(eq(schema.slides.status, 'incoming'));
+      .where(whereClause);
     const total = totalResult?.total ?? 0;
 
     const slides = await db
       .select()
       .from(schema.slides)
-      .where(eq(schema.slides.status, 'incoming'))
+      .where(whereClause)
       .orderBy(desc(schema.slides.createdAt))
       .limit(limit)
       .offset(offset);

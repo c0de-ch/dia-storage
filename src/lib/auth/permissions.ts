@@ -73,10 +73,31 @@ export function canDeleteSlide(user: User, slideUploaderId?: number): boolean {
 }
 
 /**
- * Can the user view slides?
+ * Can the user view slides at all (is an active account)?
  */
 export function canViewSlides(user: User): boolean {
   return isActive(user);
+}
+
+/**
+ * Can the user see EVERY slide regardless of uploader? Admins and editors
+ * can; regular users are scoped to their own uploads (plus anything shared
+ * with them — see slide sharing).
+ */
+export function canViewAllSlides(user: User): boolean {
+  return isActive(user) && (isAdmin(user) || hasRole(user, "editor"));
+}
+
+/**
+ * Can the user view a specific slide? Mirrors the edit model: admins and
+ * editors see all; regular users see only their own uploads. Used to gate the
+ * image-serving and metadata endpoints so a logged-in user cannot enumerate
+ * other users' slides by id.
+ */
+export function canViewSlide(user: User, slideUploaderId?: number | null): boolean {
+  if (!isActive(user)) return false;
+  if (canViewAllSlides(user)) return true;
+  return slideUploaderId != null && slideUploaderId === user.id;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +117,7 @@ export function canCreateMagazine(user: User): boolean {
 export function canEditMagazine(user: User, ownerId?: number): boolean {
   if (!isActive(user)) return false;
   if (isAdmin(user)) return true;
-  return ownerId === user.id;
+  return ownerId != null && ownerId === user.id;
 }
 
 /**
@@ -105,7 +126,7 @@ export function canEditMagazine(user: User, ownerId?: number): boolean {
 export function canDeleteMagazine(user: User, ownerId?: number): boolean {
   if (!isActive(user)) return false;
   if (isAdmin(user)) return true;
-  return ownerId === user.id;
+  return ownerId != null && ownerId === user.id;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +146,7 @@ export function canCreateCollection(user: User): boolean {
 export function canEditCollection(user: User, ownerId?: number): boolean {
   if (!isActive(user)) return false;
   if (isAdmin(user)) return true;
-  return ownerId === user.id;
+  return ownerId != null && ownerId === user.id;
 }
 
 /**
@@ -134,7 +155,7 @@ export function canEditCollection(user: User, ownerId?: number): boolean {
 export function canDeleteCollection(user: User, ownerId?: number): boolean {
   if (!isActive(user)) return false;
   if (isAdmin(user)) return true;
-  return ownerId === user.id;
+  return ownerId != null && ownerId === user.id;
 }
 
 // ---------------------------------------------------------------------------

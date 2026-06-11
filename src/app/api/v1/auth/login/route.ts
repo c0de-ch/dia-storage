@@ -41,27 +41,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Uniform response regardless of whether the account exists or is active,
+    // so the endpoint can't be used to enumerate which emails are registered.
+    // We only actually send an OTP for an existing, active account.
+    const genericResponse = NextResponse.json({
+      success: true,
+      message: 'Se esiste un account per questa email, riceverai un codice di accesso.',
+    });
+
     const [user] = await db
       .select()
       .from(schema.users)
       .where(eq(schema.users.email, email))
       .limit(1);
 
-    if (!user) {
-      // Record the attempt so unknown-email probes are also rate-limited.
+    if (!user || !user.active) {
+      // Record the attempt so unknown/disabled probes are also rate-limited,
+      // but return the same response as the success path.
       await recordAuthAttempt(email, 'login', false, ipAddress);
-      return NextResponse.json(
-        { success: false, message: 'Utente non trovato.' },
-        { status: 404 }
-      );
-    }
-
-    if (!user.active) {
-      await recordAuthAttempt(email, 'login', false, ipAddress);
-      return NextResponse.json(
-        { success: false, message: 'Account disattivato. Contattare un amministratore.' },
-        { status: 403 }
-      );
+      return genericResponse;
     }
 
     const code = await createOtpCode(user.email, user.otpChannel);
@@ -81,10 +79,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Codice OTP inviato con successo.',
-    });
+    return genericResponse;
   } catch (error) {
     console.error('Errore durante il login:', error);
     return NextResponse.json(

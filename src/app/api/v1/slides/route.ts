@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { slideVisibilityCondition } from '@/lib/auth/visibility';
 import { eq, and, desc, asc, count, ilike, gte, lte, or, ne } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {
@@ -21,6 +22,10 @@ export const GET = withAuth(async (request: NextRequest) => {
     const q = searchParams.get('q');
 
     const conditions = [];
+    // Scope to slides the requesting user may see (own uploads; admins/editors
+    // see all). Undefined for privileged users.
+    const visibility = slideVisibilityCondition((request as AuthenticatedRequest).user);
+    if (visibility) conditions.push(visibility);
     if (status) {
       conditions.push(eq(schema.slides.status, status));
     } else {
@@ -45,7 +50,9 @@ export const GET = withAuth(async (request: NextRequest) => {
           ilike(schema.slides.title, `%${q}%`),
           ilike(schema.slides.location, `%${q}%`),
           ilike(schema.slides.notes, `%${q}%`),
-          ilike(schema.slides.originalFilename, `%${q}%`)
+          ilike(schema.slides.originalFilename, `%${q}%`),
+          // Free-text date ("giugno 1985") so year queries find slides
+          ilike(schema.slides.dateTaken, `%${q}%`)
         )
       );
     }

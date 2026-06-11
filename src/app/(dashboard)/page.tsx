@@ -73,18 +73,22 @@ export default function DashboardPage() {
       value: stats?.totalSlides ?? 0,
       icon: ImageIcon,
       color: "text-blue-600 dark:text-blue-400",
+      href: "/galleria",
     },
     {
       label: "In coda",
       value: stats?.incomingCount ?? 0,
       icon: InboxIcon,
       color: "text-amber-600 dark:text-amber-400",
+      href: "/coda",
     },
     {
       label: t("nav.magazines"),
       value: stats?.magazinesCount ?? 0,
       icon: GalleryHorizontalEndIcon,
       color: "text-emerald-600 dark:text-emerald-400",
+      // Magazines are browsable via the advanced-search filter
+      href: "/ricerca?avanzata=1",
     },
   ];
 
@@ -100,21 +104,23 @@ export default function DashboardPage() {
       {/* Stats cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {statCards.map((card) => (
-          <Card key={card.label}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardDescription>{card.label}</CardDescription>
-              <card.icon className={`size-5 ${card.color}`} />
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-8 w-20" />
-              ) : (
-                <p className="text-3xl font-bold tabular-nums">
-                  {card.value.toLocaleString("it-IT")}
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          <Link key={card.label} href={card.href} className="group">
+            <Card className="h-full transition-colors group-hover:border-primary">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardDescription>{card.label}</CardDescription>
+                <card.icon className={`size-5 ${card.color}`} />
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <Skeleton className="h-8 w-20" />
+                ) : (
+                  <p className="text-3xl font-bold tabular-nums">
+                    {card.value.toLocaleString("it-IT")}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 

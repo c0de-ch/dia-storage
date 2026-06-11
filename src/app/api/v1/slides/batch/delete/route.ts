@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { canDeleteSlide } from '@/lib/auth/permissions';
 import { eq, and, inArray } from 'drizzle-orm';
 import { rm } from 'fs/promises';
 import path from 'path';
@@ -32,6 +33,18 @@ export const POST = withAuth(async (request: NextRequest) => {
       return NextResponse.json(
         { success: false, message: 'Nessuna diapositiva in arrivo trovata per questo batch.' },
         { status: 404 }
+      );
+    }
+
+    // Reject unless the user may delete every slide in the batch.
+    const user = (request as AuthenticatedRequest).user;
+    const forbidden = slides.some(
+      (s) => !canDeleteSlide(user, s.uploadedBy ?? undefined)
+    );
+    if (forbidden) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per eliminare una o più diapositive del batch.' },
+        { status: 403 }
       );
     }
 

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
-import { canEditMagazine, canDeleteMagazine } from '@/lib/auth/permissions';
+import { canEditMagazine, canDeleteMagazine, canViewAllSlides } from '@/lib/auth/permissions';
+import { slideVisibilityCondition } from '@/lib/auth/visibility';
 import { parseIdParam } from '@/lib/api/params';
 import { parseJsonBody, magazinePatchSchema } from '@/lib/api/validation';
 import { eq, and, ne } from 'drizzle-orm';
@@ -27,13 +28,25 @@ export const GET = withAuth(async (request: NextRequest, context) => {
       );
     }
 
+    const viewer = (request as AuthenticatedRequest).user;
+    if (!canViewAllSlides(viewer) && magazine.ownerUserId !== viewer.id) {
+      return NextResponse.json(
+        { success: false, message: 'Caricatore non trovato.' },
+        { status: 404 }
+      );
+    }
+
+    // Only return slides the viewer is allowed to see, so a slide pointed at
+    // this magazine by another user can't surface here.
+    const visibility = slideVisibilityCondition(viewer);
     const slides = await db
       .select()
       .from(schema.slides)
       .where(
         and(
           eq(schema.slides.magazineId, numericId),
-          ne(schema.slides.status, 'deleted')
+          ne(schema.slides.status, 'deleted'),
+          ...(visibility ? [visibility] : [])
         )
       );
 

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
-import { canEditCollection, canDeleteCollection } from '@/lib/auth/permissions';
+import { canEditCollection, canDeleteCollection, canViewAllSlides } from '@/lib/auth/permissions';
+import { slideVisibilityCondition } from '@/lib/auth/visibility';
 import { parseIdParam } from '@/lib/api/params';
 import { parseJsonBody, collectionPatchSchema } from '@/lib/api/validation';
 import { eq, and, ne, inArray } from 'drizzle-orm';
@@ -27,6 +28,17 @@ export const GET = withAuth(async (request: NextRequest, context) => {
       );
     }
 
+    const viewer = (request as AuthenticatedRequest).user;
+    if (
+      !canViewAllSlides(viewer) &&
+      collection.ownerUserId !== viewer.id
+    ) {
+      return NextResponse.json(
+        { success: false, message: 'Collezione non trovata.' },
+        { status: 404 }
+      );
+    }
+
     const collectionSlideRows = await db
       .select()
       .from(schema.slideCollections)
@@ -34,6 +46,9 @@ export const GET = withAuth(async (request: NextRequest, context) => {
 
     const slideIds = collectionSlideRows.map((cs) => cs.slideId);
 
+    // Even though the album is the viewer's, only return slides they are
+    // allowed to see — a slide could have been linked in by another path.
+    const visibility = slideVisibilityCondition(viewer);
     let slides: (typeof schema.slides.$inferSelect)[] = [];
     if (slideIds.length > 0) {
       slides = await db
@@ -42,7 +57,8 @@ export const GET = withAuth(async (request: NextRequest, context) => {
         .where(
           and(
             inArray(schema.slides.id, slideIds),
-            ne(schema.slides.status, 'deleted')
+            ne(schema.slides.status, 'deleted'),
+            ...(visibility ? [visibility] : [])
           )
         );
     }

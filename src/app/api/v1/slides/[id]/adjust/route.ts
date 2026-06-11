@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
+import { canEditSlide } from '@/lib/auth/permissions';
 import { parseIdParam } from '@/lib/api/params';
 import { eq } from 'drizzle-orm';
 import { writeFile, mkdir } from 'fs/promises';
 import sharp from 'sharp';
 import path from 'path';
 import { readImageBuffer } from '@/lib/images/heic';
+import { MAX_INPUT_PIXELS } from '@/lib/images/limits';
 
 const UPLOAD_DIR = process.env.STORAGE_PATH || './storage';
 
@@ -56,8 +58,16 @@ export const POST = withAuth(async (request: NextRequest, context) => {
       );
     }
 
+    const user = (request as AuthenticatedRequest).user;
+    if (!canEditSlide(user, slide.uploadedBy ?? undefined)) {
+      return NextResponse.json(
+        { success: false, message: 'Non hai i permessi per modificare questa diapositiva.' },
+        { status: 403 }
+      );
+    }
+
     const original = await readImageBuffer(slide.storagePath);
-    let pipeline = sharp(original, { failOn: 'none' });
+    let pipeline = sharp(original, { failOn: 'none', limitInputPixels: MAX_INPUT_PIXELS });
     // Contrast pivots around mid-gray (128); then brightness/saturation.
     if (contrast !== 1) {
       pipeline = pipeline.linear(contrast, -(128 * contrast) + 128);
