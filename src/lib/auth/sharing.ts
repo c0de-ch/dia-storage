@@ -1,11 +1,12 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { canViewAllSlides } from "./permissions";
-import type { users, collections } from "@/lib/db/schema";
+import { canViewAllSlides, canViewSlide } from "./permissions";
+import type { users, collections, slides } from "@/lib/db/schema";
 
 type User = typeof users.$inferSelect;
 type Collection = typeof collections.$inferSelect;
+type Slide = typeof slides.$inferSelect;
 
 /** Collection ids that have been shared with `userId`. */
 export async function collectionIdsSharedWith(
@@ -78,4 +79,51 @@ export async function collectionsSharedWith(userId: number) {
     .select()
     .from(schema.collections)
     .where(inArray(schema.collections.id, ids));
+}
+
+// ---------------------------------------------------------------------------
+// Gallery-level sharing (an owner shares ALL their slides with a user)
+// ---------------------------------------------------------------------------
+
+/** True if `ownerId`'s whole gallery has been shared with `viewerId`. */
+export async function gallerySharedWithUser(
+  ownerId: number | null | undefined,
+  viewerId: number
+): Promise<boolean> {
+  if (ownerId == null) return false;
+  if (ownerId === viewerId) return true;
+  const [row] = await db
+    .select({ id: schema.galleryShares.id })
+    .from(schema.galleryShares)
+    .where(
+      and(
+        eq(schema.galleryShares.ownerUserId, ownerId),
+        eq(schema.galleryShares.sharedWithUserId, viewerId)
+      )
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+/** Whether `user` may browse `ownerId`'s gallery: self, admin/editor, or shared. */
+export async function canViewOwnerGallery(
+  user: User,
+  ownerId: number
+): Promise<boolean> {
+  if (canViewAllSlides(user) || ownerId === user.id) return true;
+  return gallerySharedWithUser(ownerId, user.id);
+}
+
+/**
+ * Single source of truth for "may this user access this slide record's
+ * image/metadata?": own/admin/editor, OR the slide is in an album shared with
+ * them, OR the slide's owner shared their whole gallery with them.
+ */
+export async function canAccessSlideRecord(
+  user: User,
+  slide: Pick<Slide, "id" | "uploadedBy">
+): Promise<boolean> {
+  if (canViewSlide(user, slide.uploadedBy ?? undefined)) return true;
+  if (await gallerySharedWithUser(slide.uploadedBy, user.id)) return true;
+  return slideSharedWithUser(slide.id, user.id);
 }

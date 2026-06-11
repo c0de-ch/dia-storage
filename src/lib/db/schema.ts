@@ -320,6 +320,45 @@ export const collectionSharesRelations = relations(
 );
 
 // ---------------------------------------------------------------------------
+// Gallery shares — grants another registered user read-only access to ALL of
+// an owner's slides (their whole gallery), as opposed to a single album.
+// ---------------------------------------------------------------------------
+export const galleryShares = pgTable(
+  "gallery_shares",
+  {
+    id: serial("id").primaryKey(),
+    ownerUserId: integer("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sharedWithUserId: integer("shared_with_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("gallery_shares_unique").on(
+      table.ownerUserId,
+      table.sharedWithUserId
+    ),
+    index("gallery_shares_recipient_idx").on(table.sharedWithUserId),
+    index("gallery_shares_owner_idx").on(table.ownerUserId),
+  ]
+);
+
+export const gallerySharesRelations = relations(galleryShares, ({ one }) => ({
+  owner: one(users, {
+    fields: [galleryShares.ownerUserId],
+    references: [users.id],
+  }),
+  sharedWith: one(users, {
+    fields: [galleryShares.sharedWithUserId],
+    references: [users.id],
+  }),
+}));
+
+// ---------------------------------------------------------------------------
 // Backup History
 // ---------------------------------------------------------------------------
 export const backupHistory = pgTable(
