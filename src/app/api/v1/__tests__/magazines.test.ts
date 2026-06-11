@@ -15,7 +15,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 
 vi.mock("@/lib/db/schema", () => ({
-  magazines: { id: "magazines.id", createdAt: "magazines.createdAt" },
+  magazines: { id: "magazines.id", createdAt: "magazines.createdAt", ownerUserId: "magazines.ownerUserId" },
   users: {},
   apiKeys: {},
 }));
@@ -53,12 +53,14 @@ describe("GET /api/v1/magazines", () => {
     vi.mocked(db.select).mockImplementation(() => {
       selectCall++;
       if (selectCall === 1) {
-        return { from: vi.fn().mockResolvedValue([{ total: 1 }]) } as never;
+        // count (scoped by .where)
+        return { from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ total: 1 }]) }) } as never;
       }
+      // rows (scoped by .where)
       const mockOffset = vi.fn().mockResolvedValue(magazines);
       const mockLimit = vi.fn().mockReturnValue({ offset: mockOffset });
       const mockOrderBy = vi.fn().mockReturnValue({ limit: mockLimit });
-      return { from: vi.fn().mockReturnValue({ orderBy: mockOrderBy }) } as never;
+      return { from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ orderBy: mockOrderBy }) }) } as never;
     });
 
     const response = await GET(new NextRequest("http://localhost:3000/api/v1/magazines"));

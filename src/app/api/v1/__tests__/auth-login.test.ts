@@ -67,24 +67,32 @@ describe("POST /api/v1/auth/login", () => {
     expect(response.status).toBe(400);
   });
 
-  it("returns 404 when user is not found", async () => {
+  // Unknown and inactive accounts return the SAME generic 200 as success, so
+  // the endpoint can't be used to enumerate registered emails.
+  it("returns a generic 200 (no email sent) when user is not found", async () => {
     const mockLimit = vi.fn().mockResolvedValue([]);
     const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
     const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
     vi.mocked(db.select).mockReturnValue({ from: mockFrom } as never);
 
     const response = await POST(makeRequest({ email: "unknown@example.com" }));
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(vi.mocked(sendOtpEmail)).not.toHaveBeenCalled();
   });
 
-  it("returns 403 when user is inactive", async () => {
+  it("returns a generic 200 (no email sent) when user is inactive", async () => {
     const mockLimit = vi.fn().mockResolvedValue([{ ...mockUser, active: false }]);
     const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
     const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
     vi.mocked(db.select).mockReturnValue({ from: mockFrom } as never);
 
     const response = await POST(makeRequest({ email: "test@example.com" }));
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(vi.mocked(sendOtpEmail)).not.toHaveBeenCalled();
   });
 
   it("returns 200 and sends OTP email on success", async () => {

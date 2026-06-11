@@ -72,8 +72,8 @@ describe("POST /api/v1/slides/batch/delete", () => {
 
   it("hard-deletes all incoming slides in the batch", async () => {
     const slides = [
-      { id: 1, batchId: "batch-1", status: "incoming", storagePath: null, thumbnailPath: null, mediumPath: null },
-      { id: 2, batchId: "batch-1", status: "incoming", storagePath: null, thumbnailPath: null, mediumPath: null },
+      { id: 1, batchId: "batch-1", status: "incoming", uploadedBy: 1, storagePath: null, thumbnailPath: null, mediumPath: null },
+      { id: 2, batchId: "batch-1", status: "incoming", uploadedBy: 1, storagePath: null, thumbnailPath: null, mediumPath: null },
     ];
 
     const mockWhere = vi.fn().mockResolvedValue(slides);
@@ -105,8 +105,8 @@ describe("POST /api/v1/slides/batch/archive", () => {
 
   it("archives slides and applies metadata", async () => {
     const slides = [
-      { id: 1, batchId: "batch-1", status: "incoming" },
-      { id: 2, batchId: "batch-1", status: "incoming" },
+      { id: 1, batchId: "batch-1", status: "incoming", uploadedBy: 1 },
+      { id: 2, batchId: "batch-1", status: "incoming", uploadedBy: 1 },
     ];
 
     const mockWhere = vi.fn().mockResolvedValue(slides);

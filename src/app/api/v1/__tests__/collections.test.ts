@@ -15,9 +15,10 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 
 vi.mock("@/lib/db/schema", () => ({
-  collections: { id: "collections.id", createdAt: "collections.createdAt" },
+  collections: { id: "collections.id", createdAt: "collections.createdAt", ownerUserId: "collections.ownerUserId" },
   slideCollections: { collectionId: "slideCollections.collectionId", slideId: "slideCollections.slideId" },
-  slides: { id: "slides.id" },
+  collectionShares: { collectionId: "collectionShares.collectionId", sharedWithUserId: "collectionShares.sharedWithUserId", id: "collectionShares.id" },
+  slides: { id: "slides.id", status: "slides.status" },
   users: {},
   apiKeys: {},
 }));
@@ -60,13 +61,19 @@ describe("GET /api/v1/collections", () => {
     let selectCall = 0;
     vi.mocked(db.select).mockImplementation(() => {
       selectCall++;
+      // 1) collectionIdsSharedWith(user) — albums shared with this user
       if (selectCall === 1) {
-        return { from: vi.fn().mockResolvedValue([{ total: 2 }]) } as never;
+        return { from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }) } as never;
       }
+      // 2) count (scoped by .where)
+      if (selectCall === 2) {
+        return { from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ total: 2 }]) }) } as never;
+      }
+      // 3) rows (scoped by .where)
       const mockOffset = vi.fn().mockResolvedValue(collections);
       const mockLimit = vi.fn().mockReturnValue({ offset: mockOffset });
       const mockOrderBy = vi.fn().mockReturnValue({ limit: mockLimit });
-      return { from: vi.fn().mockReturnValue({ orderBy: mockOrderBy }) } as never;
+      return { from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ orderBy: mockOrderBy }) }) } as never;
     });
 
     const response = await GET(new NextRequest("http://localhost:3000/api/v1/collections"));
@@ -132,7 +139,7 @@ describe("GET /api/v1/collections/[id]", () => {
   });
 
   it("returns collection with slides", async () => {
-    const collection = { id: 1, name: "Vacanze" };
+    const collection = { id: 1, name: "Vacanze", ownerUserId: 1 };
     const slideCollections = [{ slideId: 10, collectionId: 1 }];
     const slides = [{ id: 10, title: "PICT0001" }];
 
