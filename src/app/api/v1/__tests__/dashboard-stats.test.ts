@@ -15,8 +15,8 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 
 vi.mock("@/lib/db/schema", () => ({
-  slides: { status: "slides.status" },
-  magazines: {},
+  slides: { status: "slides.status", uploadedBy: "slides.uploadedBy" },
+  magazines: { ownerUserId: "magazines.ownerUserId" },
   users: {},
   apiKeys: {},
 }));
@@ -54,11 +54,11 @@ describe("GET /api/v1/dashboard/stats", () => {
     vi.mocked(db.select).mockImplementation(() => {
       selectCall++;
       if (selectCall === 1) {
-        // Slide stats
-        return { from: vi.fn().mockResolvedValue([{ total: 150, incoming: 12 }]) } as never;
+        // Slide stats (scoped by .where)
+        return { from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ total: 150, incoming: 12 }]) }) } as never;
       }
-      // Magazine count
-      return { from: vi.fn().mockResolvedValue([{ total: 5 }]) } as never;
+      // Magazine count (scoped by .where)
+      return { from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ total: 5 }]) }) } as never;
     });
 
     const response = await GET(new NextRequest("http://localhost:3000/api/v1/dashboard/stats"));

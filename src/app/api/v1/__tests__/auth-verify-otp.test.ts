@@ -65,14 +65,16 @@ describe("POST /api/v1/auth/verify-otp", () => {
     expect(res3.status).toBe(400);
   });
 
-  it("returns 404 when user is not found", async () => {
+  // Unknown user returns the SAME 401 as a bad code, so it can't be used to
+  // tell registered from unregistered emails.
+  it("returns 401 (same as invalid code) when user is not found", async () => {
     const mockLimit = vi.fn().mockResolvedValue([]);
     const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
     const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
     vi.mocked(db.select).mockReturnValue({ from: mockFrom } as never);
 
     const response = await POST(makeRequest({ email: "unknown@example.com", code: "123456" }));
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(401);
   });
 
   it("returns 401 when OTP is invalid or expired", async () => {

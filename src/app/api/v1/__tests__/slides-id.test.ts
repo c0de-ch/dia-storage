@@ -61,7 +61,7 @@ describe("GET /api/v1/slides/[id]", () => {
   });
 
   it("returns slide when found", async () => {
-    const slide = { id: 1, title: "PICT0001", status: "active" };
+    const slide = { id: 1, title: "PICT0001", status: "active", uploadedBy: 1 };
     const mockLimit = vi.fn().mockResolvedValue([slide]);
     const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
     vi.mocked(db.select).mockReturnValue({ from: vi.fn().mockReturnValue({ where: mockWhere }) } as never);
