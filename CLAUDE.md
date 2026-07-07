@@ -15,7 +15,6 @@ Italian UI, passwordless OTP auth, Docker deployment.
 - All UI text in Italian - use `src/lib/i18n.ts` dictionary
 - Use Server Components by default, `"use client"` only when needed
 - API routes under `src/app/api/v1/`
-- Server Actions under `src/actions/`
 - Database schema in `src/lib/db/schema.ts`
 - Auth middleware: `withAuth()` wrapper from `src/lib/auth/middleware.ts`
 - Validate inputs with Zod schemas

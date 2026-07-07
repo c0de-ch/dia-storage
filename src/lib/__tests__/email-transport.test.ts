@@ -41,7 +41,11 @@ vi.mock("@/lib/email/templates", () => ({
 }));
 
 // Import after mocks are set up
-import { sendOtpEmail, verifyEmailTransport } from "@/lib/email/transport";
+import {
+  sendOtpEmail,
+  verifyEmailTransport,
+  sendShareNotificationEmail,
+} from "@/lib/email/transport";
 import { getOtpEmailTemplate } from "@/lib/email/templates";
 
 // ---------------------------------------------------------------------------
@@ -124,5 +128,68 @@ describe("verifyEmailTransport", () => {
 
     const result = await verifyEmailTransport();
     expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sendShareNotificationEmail
+// ---------------------------------------------------------------------------
+describe("sendShareNotificationEmail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  type MailArg = { to: string; from: string; subject: string; text: string; html: string };
+  const lastMail = () => vi.mocked(mockSendMail).mock.calls[0][0] as MailArg;
+
+  it("sends a whole-gallery notification pointing at /condivisi", async () => {
+    await sendShareNotificationEmail({
+      to: "friend@test.com",
+      sharerName: "Mario",
+      kind: "gallery",
+    });
+
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    const arg = lastMail();
+    expect(arg.to).toBe("friend@test.com");
+    expect(arg.from).toBe('"Dia-Storage" <noreply@example.com>');
+    expect(arg.subject).toBe("Mario ha condiviso la sua galleria con te");
+    expect(arg.text).toContain("la sua galleria di diapositive");
+    expect(arg.text).toContain("https://dia.example.com/condivisi");
+    expect(arg.html).toContain('href="https://dia.example.com/condivisi"');
+  });
+
+  it("sends an album notification with the album name (HTML-escaping quotes)", async () => {
+    await sendShareNotificationEmail({
+      to: "friend@test.com",
+      sharerName: "Mario",
+      kind: "album",
+      itemName: "Vacanze",
+    });
+
+    const arg = lastMail();
+    expect(arg.subject).toBe("Mario ha condiviso un album con te");
+    expect(arg.text).toContain('l\'album "Vacanze"');
+    expect(arg.html).toContain("&quot;");
+  });
+
+  it("handles a missing album name", async () => {
+    await sendShareNotificationEmail({
+      to: "friend@test.com",
+      sharerName: "Mario",
+      kind: "album",
+    });
+
+    expect(lastMail().text).toContain('l\'album ""');
+  });
+
+  it("HTML-escapes &, <, > in the sharer name", async () => {
+    await sendShareNotificationEmail({
+      to: "friend@test.com",
+      sharerName: "A & <B>",
+      kind: "gallery",
+    });
+
+    expect(lastMail().html).toContain("A &amp; &lt;B&gt;");
   });
 });

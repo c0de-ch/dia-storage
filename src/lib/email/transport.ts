@@ -61,6 +61,49 @@ export async function sendOtpEmail(
   });
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * Notify a user that an album or whole gallery has been shared with them.
+ * Best-effort: callers should not fail the share if the email can't be sent.
+ */
+export async function sendShareNotificationEmail(opts: {
+  to: string;
+  sharerName: string;
+  kind: "album" | "gallery";
+  itemName?: string;
+}): Promise<void> {
+  const config = getConfig();
+  const transport = getTransport();
+  const url = `${config.app.url}/condivisi`;
+  const whatText =
+    opts.kind === "album"
+      ? `l'album "${opts.itemName ?? ""}"`
+      : "la sua galleria di diapositive";
+  const subject =
+    opts.kind === "album"
+      ? `${opts.sharerName} ha condiviso un album con te`
+      : `${opts.sharerName} ha condiviso la sua galleria con te`;
+  const text = `${opts.sharerName} ha condiviso ${whatText} con te su Dia-Storage.\n\nApri: ${url}`;
+  const html =
+    `<p>${escapeHtml(opts.sharerName)} ha condiviso ${escapeHtml(whatText)} con te su Dia-Storage.</p>` +
+    `<p><a href="${url}">Apri Dia-Storage</a></p>`;
+
+  await transport.sendMail({
+    from: `"${config.email.fromName}" <${config.email.from}>`,
+    to: opts.to,
+    subject,
+    html,
+    text,
+  });
+}
+
 /**
  * Verify SMTP connection (useful for health checks).
  */

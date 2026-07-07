@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import {
   ArchiveIcon,
   CalendarIcon,
@@ -51,9 +50,23 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { SearchBar } from "@/components/search-bar";
 import { SlideCard, SlideCardSkeleton } from "@/components/slide-card";
+import { AlbumCard } from "@/components/album-card";
 import { BatchToolbar } from "@/components/batch-toolbar";
+import { GalleryShareButton } from "@/components/gallery-share-button";
+import { PageMasthead } from "@/components/page-masthead";
+import { EmptyMount, ErrorState } from "@/components/state-views";
+import { cn } from "@/lib/utils";
 import type { Slide, PaginationInfo } from "@/types/slide";
 
 const PER_PAGE_OPTIONS = [25, 50, 100] as const;
@@ -75,16 +88,12 @@ export default function GalleriaPage() {
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // SearchBar already debounces its onChange internally (300ms), so the
+  // page can react to searchQuery directly without a second debounce.
   const [searchQuery, setSearchQuery] = useState(
     searchParams.get("q") ?? ""
   );
-  // Debounced copy of searchQuery used by fetchSlides so we don't fire a
-  // request on every keystroke.
-  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchQuery), 250);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
   const [sortBy, setSortBy] = useState(
     searchParams.get("sortBy") ?? "createdAt"
   );
@@ -99,6 +108,39 @@ export default function GalleriaPage() {
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [archiving, setArchiving] = useState(false);
+
+  // Browse mode: ?owner=<id> shows another user's gallery shared with you
+  // (read-only). Empty string = your own gallery.
+  const ownerParam = searchParams.get("owner") ?? "";
+  const isBrowsingShared = ownerParam !== "";
+  const [ownerName, setOwnerName] = useState<string | null>(null);
+
+  // Entering/leaving a shared gallery invalidates any selection, and we
+  // resolve the owner's display name for the context banner.
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setOwnerName(null);
+    if (!ownerParam) return;
+    let cancelled = false;
+    fetch("/api/v1/shares/received", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.success) return;
+        const g = (data.galleries ?? []).find(
+          (x: { ownerId: number }) => x.ownerId === Number(ownerParam)
+        );
+        if (g) setOwnerName(g.name || g.email);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerParam]);
+
+  // "Crea album" dialog
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newAlbumName, setNewAlbumName] = useState("");
+  const [creatingAlbum, setCreatingAlbum] = useState(false);
 
   // Filters
   const [showFilters, setShowFilters] = useState(false);
@@ -128,6 +170,7 @@ export default function GalleriaPage() {
 
   const fetchSlides = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const params = new URLSearchParams({
         status: "active",
@@ -136,36 +179,60 @@ export default function GalleriaPage() {
         sortBy,
         sortOrder,
       });
-      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+      if (searchQuery.trim()) params.set("q", searchQuery.trim());
       if (filterDateFrom) params.set("dateFrom", filterDateFrom);
       if (filterDateTo) params.set("dateTo", filterDateTo);
       if (filterLocation) params.set("location", filterLocation);
+      if (filterCollectionId) params.set("collectionId", filterCollectionId);
+      // Browsing a shared gallery: scope every fetch to that owner.
+      if (ownerParam) params.set("owner", ownerParam);
 
-      let url = `/api/v1/slides?${params}`;
-
-      // If filtering by collection, use search endpoint with collection filter
-      if (filterCollectionId) {
-        url = `/api/v1/search?${params}&collectionId=${filterCollectionId}`;
-      }
-
-      const res = await fetch(url);
+      const res = await fetch(`/api/v1/slides?${params}`);
       const data = await res.json();
       if (data.success) {
         setSlides(data.slides);
         setPagination(data.pagination);
+      } else {
+        // e.g. a revoked share: don't masquerade as an empty gallery.
+        setSlides([]);
+        setPagination(null);
+        setLoadError(data.message ?? "Impossibile caricare le diapositive.");
       }
     } catch (error) {
       console.error("Errore nel caricamento:", error);
-      toast.error("Impossibile caricare le diapositive. Riprova piu tardi.");
       setSlides([]);
+      setPagination(null);
+      setLoadError("Impossibile caricare le diapositive. Riprova più tardi.");
     } finally {
       setLoading(false);
     }
-  }, [page, perPage, sortBy, sortOrder, debouncedSearch, filterDateFrom, filterDateTo, filterLocation, filterCollectionId]);
+  }, [page, perPage, sortBy, sortOrder, searchQuery, filterDateFrom, filterDateTo, filterLocation, filterCollectionId, ownerParam]);
+
+  // Shared galleries have no albums tab: a deep link with ?view=albums must
+  // still fetch and show the photo grid.
+  const effectiveTab = isBrowsingShared ? "all" : activeTab;
 
   useEffect(() => {
-    if (activeTab === "all") fetchSlides();
-  }, [fetchSlides, activeTab]);
+    if (effectiveTab === "all") fetchSlides();
+  }, [fetchSlides, effectiveTab]);
+
+  // Keep the URL in sync (shallow) so refresh/back/deep links preserve
+  // position — especially important for shared galleries entered via URL.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (ownerParam) params.set("owner", ownerParam);
+    if (!isBrowsingShared && activeTab !== "all") params.set("view", activeTab);
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    if (sortBy !== "createdAt") params.set("sortBy", sortBy);
+    if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
+    if (page !== 1) params.set("page", String(page));
+    if (perPage !== 50) params.set("limit", String(perPage));
+    const qs = params.toString();
+    const url = qs ? `/galleria?${qs}` : "/galleria";
+    if (`${window.location.pathname}${window.location.search}` !== url) {
+      window.history.replaceState(null, "", url);
+    }
+  }, [ownerParam, isBrowsingShared, activeTab, searchQuery, sortBy, sortOrder, page, perPage]);
 
   // Selection handlers
   function handleSelect(id: number, selected: boolean) {
@@ -259,6 +326,33 @@ export default function GalleriaPage() {
     setPage(1);
   }
 
+  async function handleCreateAlbum(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newAlbumName.trim();
+    if (!name) return;
+    setCreatingAlbum(true);
+    try {
+      const res = await fetch("/api/v1/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCollections((prev) => [data.collection, ...prev]);
+        toast.success("Album creato");
+        setCreateOpen(false);
+        setNewAlbumName("");
+      } else {
+        toast.error("Impossibile creare l'album.");
+      }
+    } catch {
+      toast.error("Impossibile creare l'album.");
+    } finally {
+      setCreatingAlbum(false);
+    }
+  }
+
   const hasActiveFilters = filterDateFrom || filterDateTo || filterLocation || filterCollectionId;
 
   // Build page numbers for pagination
@@ -285,40 +379,67 @@ export default function GalleriaPage() {
   const hasSelected = selectedIds.size > 0;
 
   return (
-    <div className="flex flex-col gap-4 p-4 sm:p-6">
+    <div
+      className={cn(
+        "flex flex-col gap-4 p-4 sm:p-6",
+        !isBrowsingShared && hasSelected && "pb-28"
+      )}
+    >
       {/* Editorial masthead */}
-      <header className="slide-reveal">
-        <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-muted-foreground">
-          {t("gallery.archiveLabel")}
-        </p>
-        <div className="mt-1 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-          <h1 className="text-4xl font-black uppercase leading-none tracking-tight sm:text-5xl">
-            {t("gallery.title")}
-          </h1>
-          {activeTab === "all" && (
-            <div className="flex items-baseline gap-2">
-              <span className="font-mono text-2xl font-bold leading-none tabular-nums text-primary sm:text-3xl">
-                {pagination ? String(pagination.total).padStart(4, "0") : "····"}
-              </span>
-              <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-                {pagination?.total === 1
-                  ? t("gallery.slideUnitSingular")
-                  : t("gallery.slideUnitPlural")}
-              </span>
-            </div>
-          )}
-        </div>
-        <div className="film-sprockets mt-3" aria-hidden />
-        <p className="mt-2 text-sm font-light text-muted-foreground">
-          {t("gallery.subtitle")}
-        </p>
-      </header>
+      <PageMasthead
+        eyebrow={
+          isBrowsingShared ? t("sharing.browsingEyebrow") : t("gallery.archiveLabel")
+        }
+        title={t("gallery.title")}
+        count={
+          activeTab === "all" || isBrowsingShared
+            ? pagination
+              ? pagination.total
+              : null
+            : undefined
+        }
+        countLabel={
+          pagination?.total === 1
+            ? t("gallery.slideUnitSingular")
+            : t("gallery.slideUnitPlural")
+        }
+        subtitle={isBrowsingShared ? undefined : t("gallery.subtitle")}
+        action={isBrowsingShared ? undefined : <GalleryShareButton />}
+      >
+        {isBrowsingShared && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-sm border border-primary/30 bg-primary/5 px-3 py-1.5">
+            <UsersIcon className="size-3.5 text-primary" aria-hidden />
+            <span className="text-sm">
+              {t("sharing.browsingBanner", { name: ownerName ?? "…" })}
+            </span>
+            <Badge
+              variant="outline"
+              className="font-mono text-[10px] uppercase tracking-wider"
+            >
+              {t("sharing.readOnly")}
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto"
+              nativeButton={false}
+              render={<Link href="/condivisi" />}
+            >
+              <UsersIcon className="mr-1.5 size-4" />
+              {t("sharing.backToShares")}
+            </Button>
+          </div>
+        )}
+      </PageMasthead>
 
-      {/* Tabs: Tutte le foto / Album */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      {/* Tabs: Tutte le foto / Album (hidden while browsing a shared gallery) */}
+      <Tabs value={isBrowsingShared ? "all" : activeTab} onValueChange={setActiveTab}>
         <TabsList
           variant="line"
-          className="w-full justify-start gap-5 border-b px-0"
+          className={cn(
+            "w-full justify-start gap-5 border-b px-0",
+            isBrowsingShared && "hidden"
+          )}
         >
           <TabsTrigger
             value="all"
@@ -386,7 +507,7 @@ export default function GalleriaPage() {
               )}
             </Button>
 
-            {hasSelected && (
+            {!isBrowsingShared && hasSelected && (
               <AlertDialog>
                 <AlertDialogTrigger
                   render={
@@ -459,7 +580,9 @@ export default function GalleriaPage() {
                     className="w-40"
                   />
                 </div>
-                {collections.length > 0 && (
+                {/* The collections list is the viewer's own — meaningless
+                    while browsing someone else's shared gallery. */}
+                {!isBrowsingShared && collections.length > 0 && (
                   <div className="flex flex-col gap-1">
                     <label className="text-xs font-medium text-muted-foreground">
                       <LibraryIcon className="mr-1 inline size-3" />
@@ -500,28 +623,27 @@ export default function GalleriaPage() {
                 <SlideCardSkeleton key={i} />
               ))}
             </div>
+          ) : loadError ? (
+            <ErrorState message={loadError} onRetry={fetchSlides} />
           ) : slides.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-              {/* Empty 35mm mount */}
-              <div className="w-44 -rotate-3 rounded-sm border bg-card p-2 shadow-sm">
-                <div className="flex aspect-[3/2] items-center justify-center rounded-[3px] border border-dashed bg-muted">
-                  <ImageOffIcon className="size-8 text-muted-foreground/40" />
-                </div>
-              </div>
-              <h2 className="text-lg font-medium text-muted-foreground">
-                Nessuna diapositiva trovata
-              </h2>
-              <p className="text-sm text-muted-foreground/70">
-                {hasActiveFilters
+            <EmptyMount
+              icon={ImageOffIcon}
+              title="Nessuna diapositiva trovata"
+              hint={
+                hasActiveFilters
                   ? "Prova a modificare i filtri applicati."
-                  : "Le diapositive appariranno qui dopo essere state pubblicate dalla coda."}
-              </p>
-              {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={clearFilters}>
-                  Cancella filtri
-                </Button>
-              )}
-            </div>
+                  : isBrowsingShared
+                    ? t("sharing.sharedEmptyHint")
+                    : "Le diapositive appariranno qui dopo essere state pubblicate dalla coda."
+              }
+              action={
+                hasActiveFilters ? (
+                  <Button variant="outline" size="sm" onClick={clearFilters}>
+                    Cancella filtri
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5">
               {slides.map((slide, i) => (
@@ -535,14 +657,16 @@ export default function GalleriaPage() {
                     selected={selectedIds.has(slide.id)}
                     onSelect={handleSelect}
                     showCheckbox={hasSelected}
+                    selectable={!isBrowsingShared}
                   />
                 </div>
               ))}
             </div>
           )}
 
-          {/* Pagination */}
-          {pagination && pagination.totalPages > 1 && (
+          {/* Pagination — the per-page select stays reachable whenever
+              there are slides, even on a single page. */}
+          {pagination && pagination.total > 0 && !loading && (
             <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Per pagina:</span>
@@ -563,6 +687,7 @@ export default function GalleriaPage() {
                 </Select>
               </div>
 
+              {pagination.totalPages > 1 && (
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
@@ -606,6 +731,7 @@ export default function GalleriaPage() {
                   </PaginationItem>
                 </PaginationContent>
               </Pagination>
+              )}
             </div>
           )}
         </TabsContent>
@@ -616,119 +742,93 @@ export default function GalleriaPage() {
             <p className="text-sm text-muted-foreground">
               Organizza le diapositive in album tematici
             </p>
-            <Button size="sm" nativeButton={false} render={<Link href="/galleria?view=all" />} onClick={() => {
-              // Create new collection inline
-              const name = prompt("Nome del nuovo album:");
-              if (!name) return;
-              fetch("/api/v1/collections", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name }),
-              }).then(async (res) => {
-                if (res.ok) {
-                  const data = await res.json();
-                  setCollections((prev) => [data.collection, ...prev]);
-                  toast.success("Album creato");
-                }
-              });
-            }}>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
               <FolderPlusIcon className="mr-1.5 size-4" />
               {t("gallery.createAlbum")}
             </Button>
           </div>
 
           {collections.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
-              <LibraryIcon className="size-12 text-muted-foreground/40" />
-              <h2 className="text-lg font-medium text-muted-foreground">
-                {t("gallery.noAlbums")}
-              </h2>
-            </div>
+            <EmptyMount
+              icon={LibraryIcon}
+              title={t("gallery.noAlbums")}
+              hint="Crea un album per raggruppare le diapositive per tema o viaggio."
+              action={
+                <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
+                  <FolderPlusIcon className="mr-1.5 size-4" />
+                  {t("gallery.createAlbum")}
+                </Button>
+              }
+            />
           ) : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {collections.map((collection) => (
-                <AlbumCard key={collection.id} collection={collection} />
+              {collections.map((collection, i) => (
+                <div
+                  key={collection.id}
+                  className="slide-reveal"
+                  style={{ animationDelay: `${Math.min(i * 35, 700)}ms` }}
+                >
+                  <AlbumCard collection={collection} />
+                </div>
               ))}
             </div>
           )}
+
+          {/* "Crea album" dialog (replaces the old native prompt) */}
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Nuovo album</DialogTitle>
+                <DialogDescription>
+                  Dai un nome all&apos;album: potrai aggiungere le foto subito dopo.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreateAlbum} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="new-album-name">Nome</Label>
+                  <Input
+                    id="new-album-name"
+                    value={newAlbumName}
+                    onChange={(e) => setNewAlbumName(e.target.value)}
+                    placeholder="es. Vacanze estate 1985"
+                    autoFocus
+                    required
+                  />
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setCreateOpen(false)}
+                    disabled={creatingAlbum}
+                  >
+                    {t("actions.cancel")}
+                  </Button>
+                  <Button type="submit" disabled={creatingAlbum || !newAlbumName.trim()}>
+                    {creatingAlbum ? (
+                      <Loader2Icon className="mr-1.5 size-4 animate-spin" />
+                    ) : (
+                      <FolderPlusIcon className="mr-1.5 size-4" />
+                    )}
+                    {t("actions.create")}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
 
-      {/* Batch toolbar */}
-      <BatchToolbar
-        selectedCount={selectedIds.size}
-        onEdit={handleBatchEdit}
-        onDownload={handleBatchDownload}
-        onDelete={handleBatchDelete}
-        onDeselectAll={handleDeselectAll}
-      />
+      {/* Batch toolbar — never in read-only shared mode */}
+      {!isBrowsingShared && (
+        <BatchToolbar
+          selectedCount={selectedIds.size}
+          onEdit={handleBatchEdit}
+          onDownload={handleBatchDownload}
+          onDelete={handleBatchDelete}
+          onDeselectAll={handleDeselectAll}
+        />
+      )}
     </div>
-  );
-}
-
-function AlbumCard({ collection }: { collection: Collection }) {
-  const coverUrl = collection.coverSlideId
-    ? `/api/v1/slides/${collection.coverSlideId}/thumbnail`
-    : null;
-
-  return (
-    <Link href={`/album/${collection.id}`} className="group block">
-      {/* A loose pile of mounted slides */}
-      <div className="relative">
-        <div
-          className="absolute inset-0 translate-x-1.5 rotate-[1.6deg] rounded-sm border bg-card transition-transform duration-300 group-hover:rotate-[2.8deg]"
-          aria-hidden
-        />
-        <div
-          className="absolute inset-0 -translate-x-1 rotate-[-1deg] rounded-sm border bg-card transition-transform duration-300 group-hover:rotate-[-2deg]"
-          aria-hidden
-        />
-        <div className="relative rounded-sm border bg-card p-2 shadow-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-lg group-hover:ring-2 group-hover:ring-ring/40">
-          <div className="relative aspect-[4/3] overflow-hidden rounded-[3px] bg-muted">
-            {collection.shared && (
-              <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 rounded-full bg-background/85 px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm">
-                <UsersIcon className="size-3" />
-                Condiviso
-              </span>
-            )}
-            {coverUrl ? (
-              <Image
-                src={coverUrl}
-                alt={collection.name}
-                fill
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-                loading="lazy"
-              />
-            ) : (
-              <div className="flex size-full items-center justify-center">
-                <LibraryIcon className="size-10 text-muted-foreground/40" />
-              </div>
-            )}
-            <div
-              className="pointer-events-none absolute inset-0 rounded-[3px] shadow-[inset_0_0_10px_rgba(0,0,0,0.45)]"
-              aria-hidden
-            />
-          </div>
-          <div className="px-0.5 pt-1.5 pb-0.5">
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="min-w-0 truncate text-xs font-semibold leading-tight">
-                {collection.name}
-              </p>
-              {typeof collection.slidesCount === "number" && (
-                <span className="shrink-0 font-mono text-[10px] tracking-wider text-muted-foreground/70">
-                  ×{collection.slidesCount}
-                </span>
-              )}
-            </div>
-            {collection.description && (
-              <p className="truncate font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                {collection.description}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    </Link>
   );
 }

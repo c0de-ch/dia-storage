@@ -32,6 +32,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -41,6 +52,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
@@ -49,6 +61,8 @@ import {
   ProgressLabel,
   ProgressValue,
 } from "@/components/ui/progress";
+import { PageMasthead } from "@/components/page-masthead";
+import { t } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -98,6 +112,7 @@ function MaskedField({
           variant="ghost"
           size="icon"
           type="button"
+          aria-label={visible ? "Nascondi chiave" : "Mostra chiave"}
           onClick={() => setVisible(!visible)}
         >
           {visible ? (
@@ -166,7 +181,8 @@ export default function ImpostazioniPage() {
       const res = await fetch("/api/v1/api-keys");
       const data = await res.json();
       if (data.success) {
-        setApiKeys(data.keys ?? []);
+        // The API returns { apiKeys: [...] }
+        setApiKeys(data.apiKeys ?? []);
       }
     } catch {
       toast.error("Errore nel caricamento delle chiavi API.");
@@ -282,7 +298,9 @@ export default function ImpostazioniPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setCreatedKey(data.key);
+        // The API returns { apiKey: { ..., key: rawKey } } — the raw key is
+        // only available here, at creation time.
+        setCreatedKey(data.apiKey?.key ?? "");
         setNewKeyName("");
         toast.success("Chiave API creata con successo.");
         fetchApiKeys();
@@ -296,10 +314,7 @@ export default function ImpostazioniPage() {
     }
   }
 
-  async function deleteApiKey(id: number, name: string) {
-    if (!window.confirm(`Eliminare la chiave "${name}"? Questa azione non può essere annullata.`)) {
-      return;
-    }
+  async function deleteApiKey(id: number) {
     try {
       const res = await fetch(`/api/v1/api-keys/${id}`, { method: "DELETE" });
       const data = await res.json();
@@ -314,26 +329,44 @@ export default function ImpostazioniPage() {
     }
   }
 
+  const masthead = (
+    <PageMasthead
+      size="md"
+      eyebrow="Amministrazione"
+      title={t("settings.title")}
+      subtitle="Configura i parametri dell'applicazione."
+    />
+  );
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <p className="text-muted-foreground">Caricamento...</p>
+      <div className="space-y-6">
+        {masthead}
+        <div className="space-y-4" aria-hidden>
+          <Skeleton className="h-11 w-full max-w-2xl rounded-xl" />
+          <div className="max-w-lg space-y-3 rounded-xl border p-6">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-3/4" />
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Impostazioni</h1>
-        <p className="text-muted-foreground">
-          Configura i parametri dell&apos;applicazione.
-        </p>
-      </div>
+      {masthead}
 
-      <Tabs defaultValue="generale" className="space-y-4">
-        <div className="overflow-x-auto -mx-1 px-1">
-          <TabsList className="inline-flex h-auto flex-wrap gap-1 bg-muted/50 p-1.5 rounded-xl">
+      <Tabs
+        defaultValue="generale"
+        className="slide-reveal space-y-4"
+        style={{ animationDelay: "80ms" }}
+      >
+        <div className="overflow-x-auto -mx-1 px-1 [scrollbar-width:none]">
+          <TabsList className="inline-flex h-auto flex-nowrap gap-1 bg-muted/50 p-1.5 rounded-xl">
             {/* Group: Applicazione */}
             <TabsTrigger value="generale" className="gap-1.5 rounded-lg px-3 py-2 data-[state=active]:shadow-sm">
               <Globe className="size-3.5" />
@@ -589,9 +622,9 @@ export default function ImpostazioniPage() {
 
                   {/* Newly created key display */}
                   {createdKey && (
-                    <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4">
-                      <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">
-                        Chiave creata! Copiala ora, non sarà più visibile.
+                    <div className="rounded-lg border border-success/30 bg-success/5 p-4">
+                      <p className="text-sm font-medium text-success mb-2">
+                        {t("apiKeys.keyCreated")}
                       </p>
                       <div className="flex items-center gap-2">
                         <code className="flex-1 rounded bg-muted px-3 py-2 text-sm font-mono break-all select-all">
@@ -600,9 +633,10 @@ export default function ImpostazioniPage() {
                         <Button
                           variant="outline"
                           size="icon"
+                          aria-label={t("apiKeys.copyKey")}
                           onClick={() => {
                             navigator.clipboard.writeText(createdKey);
-                            toast.success("Chiave copiata negli appunti.");
+                            toast.success(t("apiKeys.keyCopied"));
                           }}
                         >
                           <Copy className="size-4" />
@@ -624,7 +658,7 @@ export default function ImpostazioniPage() {
                     <p className="text-sm font-medium">Chiavi esistenti</p>
                     {apiKeys.length === 0 ? (
                       <p className="text-sm text-muted-foreground py-4 text-center">
-                        Nessuna chiave API configurata.
+                        {t("apiKeys.noKeys")}
                       </p>
                     ) : (
                       <div className="divide-y rounded-lg border">
@@ -644,14 +678,44 @@ export default function ImpostazioniPage() {
                                 )}
                               </p>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => deleteApiKey(key.id, key.name)}
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger
+                                render={
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`Elimina chiave ${key.name}`}
+                                    className="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                }
+                              />
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Eliminare la chiave?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    {t("apiKeys.deleteKeyConfirm")} La chiave
+                                    &quot;{key.name}&quot; non potr&agrave;
+                                    pi&ugrave; essere utilizzata. Questa azione
+                                    non pu&ograve; essere annullata.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>
+                                    {t("actions.cancel")}
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction
+                                    variant="destructive"
+                                    onClick={() => deleteApiKey(key.id)}
+                                  >
+                                    {t("actions.delete")}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         ))}
                       </div>
@@ -1155,33 +1219,16 @@ export default function ImpostazioniPage() {
                         })
                       }
                     />
-                    <Button
-                      variant="outline"
-                      className="mt-4"
-                      onClick={async () => {
-                        try {
-                          const res = await fetch("/api/v1/config/test-nas", {
-                            method: "POST",
-                          });
-                          const data = await res.json();
-                          if (res.ok && data.success) {
-                            toast.success(
-                              "Verifica scrittura NAS riuscita."
-                            );
-                          } else {
-                            toast.error(
-                              data.message ??
-                                "Errore nella verifica scrittura NAS."
-                            );
-                          }
-                        } catch {
-                          toast.error("Errore nella verifica scrittura NAS.");
-                        }
-                      }}
-                    >
+                    {/* L'endpoint di verifica scrittura NAS non è ancora
+                        disponibile: pulsante parcheggiato come per
+                        l'assistenza remota in /aiuto */}
+                    <Button variant="outline" className="mt-4" disabled>
                       <Key className="size-4 mr-1.5" />
                       Verifica scrittura
                     </Button>
+                    <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                      Funzione in preparazione
+                    </p>
                   </div>
                 </div>
               </CardContent>

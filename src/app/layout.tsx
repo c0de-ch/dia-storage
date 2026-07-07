@@ -44,7 +44,13 @@ export default function RootLayout({
           <AuthProvider>
             {children}
           </AuthProvider>
-          <Toaster position="bottom-right" richColors closeButton />
+          {/* offset clears the fixed help FAB in the same corner */}
+          <Toaster
+            position="bottom-right"
+            richColors
+            closeButton
+            offset={{ bottom: 88, right: 24 }}
+          />
         </ThemeProvider>
       </body>
     </html>

@@ -108,7 +108,7 @@ const HIDDEN_KEYS = new Set([
   "thumbnail",
 ]);
 
-function formatValue(value: unknown): string {
+function formatValue(value: unknown, key?: string): string {
   if (value === null || value === undefined) return "—";
   if (value instanceof Date) return value.toLocaleString("it-IT");
   if (typeof value === "string") {
@@ -119,15 +119,17 @@ function formatValue(value: unknown): string {
     return value;
   }
   if (typeof value === "number") {
-    // Format fractions nicely (e.g. exposure time 1/125)
-    if (value > 0 && value < 1) {
+    // Only exposure time reads as a fraction (e.g. 1/125 s); other
+    // sub-1 numbers (BrightnessValue, ExposureBiasValue, resolutions…)
+    // must stay decimal.
+    if (key === "ExposureTime" && value > 0 && value < 1) {
       const denom = Math.round(1 / value);
       return `1/${denom}`;
     }
     return value.toLocaleString("it-IT");
   }
   if (typeof value === "boolean") return value ? "Si" : "No";
-  if (Array.isArray(value)) return value.map(formatValue).join(", ");
+  if (Array.isArray(value)) return value.map((v) => formatValue(v)).join(", ");
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
@@ -144,7 +146,10 @@ function ExifRow({ label, value }: { label: string; value: string }) {
       <span className="shrink-0 font-medium text-muted-foreground">
         {label}
       </span>
-      <span className="truncate text-right" title={value}>
+      <span
+        className="truncate text-right font-mono text-[11px] tabular-nums"
+        title={value}
+      >
         {value}
       </span>
     </div>
@@ -172,7 +177,7 @@ export function ExifPanel({
     label: cat.label,
     entries: cat.keys
       .filter((k) => raw[k] !== undefined && raw[k] !== null)
-      .map((k) => ({ key: k, value: formatValue(raw[k]) })),
+      .map((k) => ({ key: k, value: formatValue(raw[k], k) })),
   })).filter((cat) => cat.entries.length > 0);
 
   // "Other" keys not in any category
@@ -185,7 +190,7 @@ export function ExifPanel({
         v !== null &&
         typeof v !== "object"
     )
-    .map(([k, v]) => ({ key: k, value: formatValue(v) }));
+    .map(([k, v]) => ({ key: k, value: formatValue(v, k) }));
 
   const exifCount = Object.keys(raw).filter(
     (k) => !HIDDEN_KEYS.has(k) && raw[k] !== undefined && raw[k] !== null
@@ -238,7 +243,7 @@ export function ExifPanel({
         <div className="mt-2 rounded-lg border px-3 py-2 space-y-3">
           {/* File info (always shown) */}
           <div>
-            <h4 className="mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <h4 className="mb-1 font-mono text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.2em]">
               File
             </h4>
             {originalFilename && (
@@ -270,7 +275,7 @@ export function ExifPanel({
             <>
               {categorized.map((cat) => (
                 <div key={cat.label}>
-                  <h4 className="mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <h4 className="mb-1 font-mono text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.2em]">
                     {cat.label}
                   </h4>
                   {cat.entries.map((e) => (
@@ -284,7 +289,7 @@ export function ExifPanel({
                 <div>
                   <button
                     type="button"
-                    className="mb-1 flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+                    className="mb-1 flex items-center gap-1 font-mono text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.2em] hover:text-foreground transition-colors"
                     onClick={() => setShowAll(!showAll)}
                   >
                     <InfoIcon className="size-3" />
@@ -314,7 +319,7 @@ export function ExifPanel({
             onClick={handleCopy}
           >
             {copied ? (
-              <CheckIcon className="size-3 mr-1.5 text-green-600" />
+              <CheckIcon className="size-3 mr-1.5 text-success" />
             ) : (
               <CopyIcon className="size-3 mr-1.5" />
             )}

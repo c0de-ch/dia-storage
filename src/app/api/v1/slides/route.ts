@@ -3,7 +3,8 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { slideVisibilityCondition } from '@/lib/auth/visibility';
-import { eq, and, desc, asc, count, ilike, gte, lte, or, ne } from 'drizzle-orm';
+import { canViewOwnerGallery } from '@/lib/auth/sharing';
+import { eq, and, desc, asc, count, ilike, gte, lte, or, ne, sql } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {
   try {
@@ -21,11 +22,24 @@ export const GET = withAuth(async (request: NextRequest) => {
     const dateTo = searchParams.get('dateTo');
     const q = searchParams.get('q');
 
+    const user = (request as AuthenticatedRequest).user;
     const conditions = [];
-    // Scope to slides the requesting user may see (own uploads; admins/editors
-    // see all). Undefined for privileged users.
-    const visibility = slideVisibilityCondition((request as AuthenticatedRequest).user);
-    if (visibility) conditions.push(visibility);
+    // `owner` browses another user's gallery (only if they shared it with you,
+    // or you're an admin/editor). Otherwise scope to your own slides.
+    const ownerParam = searchParams.get('owner');
+    if (ownerParam) {
+      const ownerId = Number(ownerParam);
+      if (!Number.isInteger(ownerId) || !(await canViewOwnerGallery(user, ownerId))) {
+        return NextResponse.json(
+          { success: false, message: 'Galleria non disponibile.' },
+          { status: 404 }
+        );
+      }
+      conditions.push(eq(schema.slides.uploadedBy, ownerId));
+    } else {
+      const visibility = slideVisibilityCondition(user);
+      if (visibility) conditions.push(visibility);
+    }
     if (status) {
       conditions.push(eq(schema.slides.status, status));
     } else {
@@ -34,6 +48,16 @@ export const GET = withAuth(async (request: NextRequest) => {
     }
     if (magazineId) {
       conditions.push(eq(schema.slides.magazineId, Number(magazineId)));
+    }
+    // Filter by album membership (visibility conditions above still apply).
+    const collectionIdParam = searchParams.get('collectionId');
+    if (collectionIdParam) {
+      const collectionId = Number(collectionIdParam);
+      if (Number.isInteger(collectionId)) {
+        conditions.push(
+          sql`EXISTS (SELECT 1 FROM slide_collections sc WHERE sc.slide_id = ${schema.slides.id} AND sc.collection_id = ${collectionId})`
+        );
+      }
     }
     if (location) {
       conditions.push(ilike(schema.slides.location, `%${location}%`));

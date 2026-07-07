@@ -17,7 +17,6 @@ import {
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -60,6 +59,82 @@ function makeWelcomeMessage(lang: LangCode): ChatMessage {
   return { id: "welcome", role: "assistant", text: WELCOME_MESSAGES[lang] };
 }
 
+/**
+ * Chrome strings for the chat UI, localized to the selected chat language so
+ * that switching to EN/DE/FR/ZH does not leave Italian labels around the
+ * translated conversation.
+ */
+const CHROME_STRINGS: Record<
+  LangCode,
+  {
+    subtitle: string;
+    placeholder: string;
+    thinking: string;
+    listening: string;
+    replay: string;
+    stop: string;
+    copy: string;
+    copied: string;
+    connectionError: string;
+  }
+> = {
+  "it-IT": {
+    subtitle: "Chiedimi qualcosa — scrivi o usa il microfono",
+    placeholder: "Scrivi una domanda...",
+    thinking: "Sto pensando...",
+    listening: "Sto ascoltando...",
+    replay: "Riascolta",
+    stop: "Ferma",
+    copy: "Copia",
+    copied: "Copiato",
+    connectionError: "Errore di connessione. Riprova.",
+  },
+  "en-US": {
+    subtitle: "Ask me anything — type or use the microphone",
+    placeholder: "Type a question...",
+    thinking: "Thinking...",
+    listening: "Listening...",
+    replay: "Replay",
+    stop: "Stop",
+    copy: "Copy",
+    copied: "Copied",
+    connectionError: "Connection error. Please try again.",
+  },
+  "de-DE": {
+    subtitle: "Frag mich etwas — schreibe oder nutze das Mikrofon",
+    placeholder: "Frage eingeben...",
+    thinking: "Ich denke nach...",
+    listening: "Ich höre zu...",
+    replay: "Erneut anhören",
+    stop: "Stopp",
+    copy: "Kopieren",
+    copied: "Kopiert",
+    connectionError: "Verbindungsfehler. Bitte erneut versuchen.",
+  },
+  "fr-FR": {
+    subtitle: "Posez-moi une question — écrivez ou utilisez le micro",
+    placeholder: "Écrivez une question...",
+    thinking: "Je réfléchis...",
+    listening: "Je vous écoute...",
+    replay: "Réécouter",
+    stop: "Arrêter",
+    copy: "Copier",
+    copied: "Copié",
+    connectionError: "Erreur de connexion. Veuillez réessayer.",
+  },
+  "zh-CN": {
+    subtitle: "问我任何问题 — 输入或使用麦克风",
+    placeholder: "输入问题...",
+    thinking: "正在思考...",
+    listening: "正在聆听...",
+    replay: "重听",
+    stop: "停止",
+    copy: "复制",
+    copied: "已复制",
+    connectionError: "连接错误，请重试。",
+  },
+};
+
 /** Strip markdown syntax so TTS reads clean text. */
 function stripMarkdown(md: string): string {
   return md
@@ -85,6 +160,7 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [voiceMode, setVoiceMode] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const voiceModeRef = useRef(voiceMode);
@@ -168,13 +244,33 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
     }
   }, [voiceMode, isSpeaking, cancel]);
 
-  const speakIfVoice = useCallback(
-    (text: string) => {
-      if (voiceModeRef.current) {
-        speak(stripMarkdown(text));
-      }
+  // Message the current (or most recently requested) utterance belongs to,
+  // so the Stop control always renders on the bubble actually being spoken.
+  const pendingSpeakIdRef = useRef<string | null>(null);
+
+  const speakMessage = useCallback(
+    (id: string, text: string) => {
+      pendingSpeakIdRef.current = id;
+      setSpeakingId(id);
+      speak(stripMarkdown(text));
     },
     [speak]
+  );
+
+  // Re-assert the speaking message when the utterance actually starts
+  // (onstart fires async, possibly after a cancel() reset it) and clear the
+  // highlight whenever speech ends for any reason.
+  useEffect(() => {
+    setSpeakingId(isSpeaking ? pendingSpeakIdRef.current : null);
+  }, [isSpeaking]);
+
+  const speakIfVoice = useCallback(
+    (id: string, text: string) => {
+      if (voiceModeRef.current) {
+        speakMessage(id, text);
+      }
+    },
+    [speakMessage]
   );
 
   const handleSubmit = useCallback(
@@ -199,7 +295,7 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
           text: quickMatch.voiceAnswer,
         };
         setMessages((prev) => [...prev, userMsg, quickMsg]);
-        speakIfVoice(quickMatch.voiceAnswer);
+        speakIfVoice(quickBotId, quickMatch.voiceAnswer);
       } else {
         setMessages((prev) => [...prev, userMsg]);
       }
@@ -230,7 +326,7 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
 
         const data = await res.json();
         const fullAnswer =
-          data.answer ?? data.message ?? data.error ?? "Errore nella risposta.";
+          data.answer ?? data.message ?? data.error ?? CHROME_STRINGS[lang].connectionError;
 
         if (quickMatch) {
           // Replace quick answer with full AI answer, then speak the new one
@@ -241,7 +337,7 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
           );
           // Cancel the quick answer speech and speak the full answer
           cancel();
-          speakIfVoice(fullAnswer);
+          speakIfVoice(quickBotId, fullAnswer);
         } else {
           const botMsg: ChatMessage = {
             id: `bot-${Date.now()}`,
@@ -249,14 +345,14 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
             text: fullAnswer,
           };
           setMessages((prev) => [...prev, botMsg]);
-          speakIfVoice(fullAnswer);
+          speakIfVoice(botMsg.id, fullAnswer);
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
           // Superseded by a newer question or unmount -- silently drop.
           return;
         }
-        const errorText = "Errore di connessione. Riprova.";
+        const errorText = CHROME_STRINGS[lang].connectionError;
         if (!quickMatch) {
           const errorMsg: ChatMessage = {
             id: `bot-${Date.now()}`,
@@ -264,8 +360,10 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
             text: errorText,
           };
           setMessages((prev) => [...prev, errorMsg]);
+          speakIfVoice(errorMsg.id, errorText);
+        } else {
+          speakIfVoice(quickBotId, errorText);
         }
-        speakIfVoice(errorText);
       } finally {
         if (fetchAbortRef.current === controller) {
           fetchAbortRef.current = null;
@@ -295,11 +393,17 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
     }
   }
 
-  function handleSpeakMessage(text: string) {
-    if (isSpeaking) {
+  function handleSpeakMessage(id: string, text: string) {
+    if (isSpeaking && speakingId === id) {
+      // Second click on the same message: stop playback.
       cancel();
+      pendingSpeakIdRef.current = null;
+      setSpeakingId(null);
     } else {
-      speak(stripMarkdown(text));
+      // One click switches playback to this message, even if another
+      // message is currently being spoken.
+      cancel();
+      speakMessage(id, text);
     }
   }
 
@@ -321,18 +425,20 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
     setMessages([makeWelcomeMessage(newLang)]);
   }
 
+  const chrome = CHROME_STRINGS[lang];
+
   return (
     <div className="flex h-full flex-col">
       {/* Header bar */}
-      <div className="flex items-center justify-between border-b px-4 py-3">
+      <div className="flex items-center justify-between px-4 pb-2 pt-3">
         <div className="flex items-center gap-2">
           <div className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <BotIcon className="size-4" />
           </div>
           <div>
             <h2 className="text-sm font-semibold">Assistente Dia-Storage</h2>
-            <p className="text-xs text-muted-foreground">
-              Chiedimi qualcosa — scrivi o usa il microfono
+            <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+              {chrome.subtitle}
             </p>
           </div>
         </div>
@@ -385,10 +491,15 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
           )}
         </div>
       </div>
+      <div className="film-sprockets mx-4 shrink-0" aria-hidden />
 
       {/* Messages */}
       <ScrollArea className="min-h-0 flex-1 px-4">
-        <div className="flex flex-col gap-3 py-4">
+        <div
+          role="log"
+          aria-live="polite"
+          className="mx-auto flex w-full max-w-3xl flex-col gap-3 py-4"
+        >
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -415,7 +526,7 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
                 }`}
               >
                 {msg.role === "assistant" ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-headings:text-sm">
+                  <div className="prose prose-sm dark:prose-invert glass:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-headings:text-sm">
                     <ReactMarkdown>{msg.text}</ReactMarkdown>
                   </div>
                 ) : (
@@ -425,12 +536,22 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
                   <div className="mt-1 flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => handleSpeakMessage(msg.text)}
+                      onClick={() => handleSpeakMessage(msg.id, msg.text)}
                       className="flex items-center gap-1 text-xs text-muted-foreground transition-opacity hover:text-foreground"
-                      aria-label="Riascolta"
+                      aria-label={
+                        isSpeaking && speakingId === msg.id
+                          ? chrome.stop
+                          : chrome.replay
+                      }
                     >
-                      <Volume2Icon className="size-3" />
-                      Riascolta
+                      {isSpeaking && speakingId === msg.id ? (
+                        <VolumeXIcon className="size-3" />
+                      ) : (
+                        <Volume2Icon className="size-3" />
+                      )}
+                      {isSpeaking && speakingId === msg.id
+                        ? chrome.stop
+                        : chrome.replay}
                     </button>
                     <button
                       type="button"
@@ -440,14 +561,14 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
                         setTimeout(() => setCopiedId(null), 2000);
                       }}
                       className="flex items-center gap-1 text-xs text-muted-foreground transition-opacity hover:text-foreground"
-                      aria-label="Copia"
+                      aria-label={chrome.copy}
                     >
                       {copiedId === msg.id ? (
-                        <CheckIcon className="size-3 text-green-600" />
+                        <CheckIcon className="size-3 text-success" />
                       ) : (
                         <CopyIcon className="size-3" />
                       )}
-                      {copiedId === msg.id ? "Copiato" : "Copia"}
+                      {copiedId === msg.id ? chrome.copied : chrome.copy}
                     </button>
                   </div>
                 )}
@@ -463,7 +584,7 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
               </div>
               <div className="flex items-center gap-2 rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground">
                 <Loader2Icon className="size-4 animate-spin" />
-                Sto pensando...
+                {chrome.thinking}
               </div>
             </div>
           )}
@@ -472,14 +593,16 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
           {messages.length <= 1 && (
             <div className="flex flex-wrap gap-2 pt-2">
               {suggestedTopics.map((topic) => (
-                <Badge
+                <Button
                   key={topic}
+                  type="button"
                   variant="outline"
-                  className="cursor-pointer px-3 py-1.5 text-sm transition-colors hover:bg-accent"
+                  size="sm"
+                  className="h-auto rounded-full px-3 py-1.5 text-sm font-normal"
                   onClick={() => handleTopicClick(topic)}
                 >
                   {topic}
-                </Badge>
+                </Button>
               ))}
             </div>
           )}
@@ -489,57 +612,59 @@ export function HelpBotChat({ autoStartMic = false }: HelpBotChatProps) {
 
       {/* Listening indicator */}
       {isListening && (
-        <div className="flex items-center gap-2 px-4 py-1 text-sm text-emerald-600 dark:text-emerald-400">
-          <span className="size-2.5 animate-pulse rounded-full bg-emerald-500" />
-          Sto ascoltando...{transcript && ` "${transcript}"`}
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 py-1 text-sm text-primary">
+          <span className="size-2.5 animate-pulse rounded-full bg-primary" />
+          {chrome.listening}
+          {transcript && ` "${transcript}"`}
         </div>
       )}
 
       {/* Mic error */}
       {micError && (
-        <p className="px-4 py-1 text-xs text-destructive">{micError}</p>
+        <p className="mx-auto w-full max-w-3xl px-4 py-1 text-xs text-destructive">
+          {micError}
+        </p>
       )}
 
       {/* Input area */}
-      <form
-        onSubmit={handleFormSubmit}
-        className="flex items-center gap-2 border-t px-4 py-3"
-      >
-        {micSupported && (
+      <form onSubmit={handleFormSubmit} className="border-t px-4 py-3">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
+          {micSupported && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className={`size-10 shrink-0 ${
+                isListening
+                  ? "animate-pulse border-primary bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
+                  : ""
+              }`}
+              onClick={handleMicToggle}
+              aria-label={
+                isListening ? "Disattiva microfono" : "Attiva microfono"
+              }
+            >
+              <MicIcon className="size-5" />
+            </Button>
+          )}
+          <Input
+            ref={inputRef}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder={chrome.placeholder}
+            disabled={isListening || isLoading}
+            className="h-10 flex-1"
+          />
           <Button
-            type="button"
-            variant="outline"
+            type="submit"
             size="icon"
-            className={`size-10 shrink-0 ${
-              isListening
-                ? "animate-pulse border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 dark:hover:bg-emerald-900"
-                : ""
-            }`}
-            onClick={handleMicToggle}
-            aria-label={
-              isListening ? "Disattiva microfono" : "Attiva microfono"
-            }
+            disabled={!inputValue.trim() || isListening || isLoading}
+            className="size-10 shrink-0"
+            aria-label="Invia"
           >
-            <MicIcon className="size-5" />
+            <SendIcon className="size-5" />
           </Button>
-        )}
-        <Input
-          ref={inputRef}
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Scrivi una domanda..."
-          disabled={isListening || isLoading}
-          className="h-10 flex-1"
-        />
-        <Button
-          type="submit"
-          size="icon"
-          disabled={!inputValue.trim() || isListening || isLoading}
-          className="size-10 shrink-0"
-          aria-label="Invia"
-        >
-          <SendIcon className="size-5" />
-        </Button>
+        </div>
       </form>
     </div>
   );

@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { slideVisibilityCondition } from '@/lib/auth/visibility';
+import { canViewOwnerGallery } from '@/lib/auth/sharing';
 import { and, or, ilike, gte, lte, eq, desc, count, sql } from 'drizzle-orm';
 
 export const GET = withAuth(async (request: NextRequest) => {
@@ -16,12 +17,24 @@ export const GET = withAuth(async (request: NextRequest) => {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50')));
     const offset = (page - 1) * limit;
 
+    const user = (request as AuthenticatedRequest).user;
     const conditions = [];
 
-    // Scope to slides the requesting user may see (own uploads; admins/editors
-    // see all).
-    const visibility = slideVisibilityCondition((request as AuthenticatedRequest).user);
-    if (visibility) conditions.push(visibility);
+    // `owner` browses another user's shared gallery; otherwise own slides.
+    const ownerParam = searchParams.get('owner');
+    if (ownerParam) {
+      const ownerId = Number(ownerParam);
+      if (!Number.isInteger(ownerId) || !(await canViewOwnerGallery(user, ownerId))) {
+        return NextResponse.json(
+          { success: false, message: 'Galleria non disponibile.' },
+          { status: 404 }
+        );
+      }
+      conditions.push(eq(schema.slides.uploadedBy, ownerId));
+    } else {
+      const visibility = slideVisibilityCondition(user);
+      if (visibility) conditions.push(visibility);
+    }
 
     // Exclude deleted slides from search
     conditions.push(sql`${schema.slides.status} != 'deleted'`);

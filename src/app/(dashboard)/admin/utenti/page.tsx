@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   Copy,
@@ -12,17 +12,11 @@ import {
   ShieldAlert,
   Trash2,
   UserPlus,
+  Users,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogClose,
@@ -43,6 +37,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -52,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -60,7 +56,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageMasthead } from "@/components/page-masthead";
+import { StatusBadge } from "@/components/status-badge";
+import { EmptyMount } from "@/components/state-views";
+import { useAuth } from "@/lib/auth/context";
 import { t } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -77,15 +78,14 @@ interface User {
   createdAt: string;
 }
 
+// Mirrors GET /api/v1/api-keys: revoked keys are deleted server-side,
+// so every key returned here is active.
 interface ApiKey {
-  id: string;
+  id: number;
   name: string;
-  prefix: string;
-  userId: string;
+  userId: number;
   createdAt: string;
   lastUsedAt: string | null;
-  expiresAt: string | null;
-  active: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,10 +96,14 @@ function roleBadge(role: string) {
   switch (role) {
     case "admin":
       return (
-        <Badge className="bg-blue-600 text-white hover:bg-blue-700">
+        <Badge className="border-transparent bg-primary/15 text-primary">
           Admin
         </Badge>
       );
+    case "operator":
+      return <Badge variant="secondary">Operatore</Badge>;
+    case "viewer":
+      return <Badge variant="outline">Visualizzatore</Badge>;
     default:
       return <Badge variant="secondary">{t("roles.user")}</Badge>;
   }
@@ -107,11 +111,9 @@ function roleBadge(role: string) {
 
 function statusBadge(active: boolean) {
   return active ? (
-    <Badge className="bg-green-600 text-white hover:bg-green-700">
-      Attivo
-    </Badge>
+    <StatusBadge tone="success">{t("labels.active")}</StatusBadge>
   ) : (
-    <Badge variant="destructive">Disattivato</Badge>
+    <StatusBadge tone="destructive">{t("labels.inactive")}</StatusBadge>
   );
 }
 
@@ -295,7 +297,7 @@ function ApiKeyCreatedDialog({
 
   function handleCopy() {
     navigator.clipboard.writeText(apiKey);
-    toast.success("Chiave copiata negli appunti.");
+    toast.success(t("apiKeys.keyCopied"));
   }
 
   return (
@@ -319,11 +321,18 @@ function ApiKeyCreatedDialog({
             variant="ghost"
             size="icon"
             type="button"
+            aria-label={showKey ? "Nascondi chiave" : "Mostra chiave"}
             onClick={() => setShowKey(!showKey)}
           >
             {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </Button>
-          <Button variant="outline" size="icon" type="button" onClick={handleCopy}>
+          <Button
+            variant="outline"
+            size="icon"
+            type="button"
+            aria-label={t("apiKeys.copyKey")}
+            onClick={handleCopy}
+          >
             <Copy className="size-4" />
           </Button>
         </div>
@@ -339,15 +348,17 @@ function ApiKeyCreatedDialog({
 }
 
 // ---------------------------------------------------------------------------
-// API Keys section per user
+// API Keys panel (rendered inline in the expanded table row)
 // ---------------------------------------------------------------------------
 
 function UserApiKeys({
   userId,
   userName,
+  isSelf,
 }: {
   userId: string;
   userName: string | null;
+  isSelf: boolean;
 }) {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
@@ -362,7 +373,9 @@ function UserApiKeys({
       const data = await res.json();
       if (data.success) {
         setKeys(
-          (data.apiKeys ?? []).filter((k: ApiKey) => k.userId === userId)
+          (data.apiKeys ?? []).filter(
+            (k: ApiKey) => String(k.userId) === String(userId)
+          )
         );
       }
     } catch {
@@ -404,7 +417,7 @@ function UserApiKeys({
     }
   }
 
-  async function revokeKey(keyId: string) {
+  async function revokeKey(keyId: number) {
     try {
       const res = await fetch(`/api/v1/api-keys/${keyId}`, {
         method: "DELETE",
@@ -429,123 +442,115 @@ function UserApiKeys({
         onOpenChange={setShowCreatedDialog}
       />
 
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Key className="size-4" />
+      <div className="space-y-4">
+        <div>
+          <p className="flex items-center gap-2 text-sm font-medium">
+            <Key className="size-4" aria-hidden />
             Chiavi API &mdash; {userName ?? "Utente"}
-          </CardTitle>
-          <CardDescription>
-            Gestisci le chiavi API associate a questo utente.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Generate new key */}
-          <div className="mb-4 flex items-end gap-2">
-            <div className="flex-1">
+          </p>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {isSelf
+              ? "Gestisci le chiavi API associate al tuo account."
+              : "Le chiavi API possono essere generate solo dal proprio account: qui è disponibile l'elenco in sola lettura."}
+          </p>
+        </div>
+
+        {/* Generate new key (only for the logged-in admin's own row: the API
+            always assigns new keys to the authenticated user) */}
+        {isSelf && (
+          <div className="flex items-end gap-2">
+            <div className="max-w-xs flex-1">
               <Label htmlFor={`key-name-${userId}`}>Nome chiave</Label>
               <Input
                 id={`key-name-${userId}`}
                 value={keyName}
                 onChange={(e) => setKeyName(e.target.value)}
                 placeholder="Es. Scanner locale"
+                className="mt-1.5"
               />
             </div>
-            <Button
-              onClick={generateKey}
-              disabled={generating}
-              size="sm"
-            >
+            <Button onClick={generateKey} disabled={generating} size="sm">
               <Plus className="size-4 mr-1" />
               {generating ? "Generazione..." : "Genera chiave"}
             </Button>
           </div>
+        )}
 
-          {/* Keys list */}
-          {loading ? (
-            <p className="text-muted-foreground text-sm">{t("labels.loading")}</p>
-          ) : keys.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              Nessuna chiave API presente.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Prefisso</TableHead>
-                  <TableHead>Creata il</TableHead>
-                  <TableHead>Ultimo utilizzo</TableHead>
-                  <TableHead>Stato</TableHead>
-                  <TableHead>Azioni</TableHead>
+        {/* Keys list */}
+        {loading ? (
+          <div className="space-y-2" aria-hidden>
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        ) : keys.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            {t("apiKeys.noKeys")}
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Creata il</TableHead>
+                <TableHead>Ultimo utilizzo</TableHead>
+                <TableHead>Stato</TableHead>
+                <TableHead>Azioni</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {keys.map((k) => (
+                <TableRow key={k.id}>
+                  <TableCell className="font-medium">{k.name}</TableCell>
+                  <TableCell className="font-mono text-xs tabular-nums">
+                    {new Date(k.createdAt).toLocaleDateString("it-IT")}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs tabular-nums">
+                    {k.lastUsedAt
+                      ? new Date(k.lastUsedAt).toLocaleDateString("it-IT")
+                      : "Mai"}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge tone="success">Attiva</StatusBadge>
+                  </TableCell>
+                  <TableCell>
+                    <AlertDialog>
+                      <AlertDialogTrigger
+                        render={
+                          <Button variant="destructive" size="xs">
+                            <Trash2 className="size-3 mr-1" />
+                            Revoca
+                          </Button>
+                        }
+                      />
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            Revocare la chiave?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            La chiave &quot;{k.name}&quot; non potr&agrave;
+                            pi&ugrave; essere utilizzata. Questa azione
+                            &egrave; irreversibile.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
+                          <AlertDialogAction
+                            variant="destructive"
+                            onClick={() => revokeKey(k.id)}
+                          >
+                            Revoca
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {keys.map((k) => (
-                  <TableRow key={k.id}>
-                    <TableCell className="font-medium">{k.name}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {k.prefix}...
-                    </TableCell>
-                    <TableCell>
-                      {new Date(k.createdAt).toLocaleDateString("it-IT")}
-                    </TableCell>
-                    <TableCell>
-                      {k.lastUsedAt
-                        ? new Date(k.lastUsedAt).toLocaleDateString("it-IT")
-                        : "Mai"}
-                    </TableCell>
-                    <TableCell>
-                      {k.active ? (
-                        <Badge className="bg-green-600 text-white hover:bg-green-700">
-                          Attiva
-                        </Badge>
-                      ) : (
-                        <Badge variant="destructive">Revocata</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {k.active && (
-                        <AlertDialog>
-                          <AlertDialogTrigger
-                            render={
-                              <Button variant="destructive" size="xs">
-                                <Trash2 className="size-3 mr-1" />
-                                Revoca
-                              </Button>
-                            }
-                          />
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                Revocare la chiave?
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                La chiave &quot;{k.name}&quot; non potr&agrave;
-                                pi&ugrave; essere utilizzata. Questa azione
-                                &egrave; irreversibile.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
-                              <AlertDialogAction
-                                variant="destructive"
-                                onClick={() => revokeKey(k.id)}
-                              >
-                                Revoca
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
     </>
   );
 }
@@ -554,7 +559,10 @@ function UserApiKeys({
 // Main page
 // ---------------------------------------------------------------------------
 
+const USERS_TABLE_COLUMNS = 7;
+
 export default function UtentiPage() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -608,20 +616,20 @@ export default function UtentiPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {t("users.title")}
-          </h1>
-          <p className="text-muted-foreground">
-            {t("users.subtitle")}
-          </p>
-        </div>
-        <Button onClick={openAdd}>
-          <UserPlus className="size-4 mr-1.5" />
-          {t("users.createUser")}
-        </Button>
-      </div>
+      <PageMasthead
+        size="md"
+        eyebrow="Amministrazione"
+        title={t("users.title")}
+        count={loading ? null : users.length}
+        countLabel={users.length === 1 ? "utente" : "utenti"}
+        subtitle={t("users.subtitle")}
+        action={
+          <Button onClick={openAdd}>
+            <UserPlus className="size-4 mr-1.5" />
+            {t("users.createUser")}
+          </Button>
+        }
+      />
 
       <UserFormDialog
         user={editingUser}
@@ -630,16 +638,15 @@ export default function UtentiPage() {
         onSaved={fetchUsers}
       />
 
-      <Card>
+      <Card className="slide-reveal" style={{ animationDelay: "80ms" }}>
         <CardContent className="pt-4">
-          {loading ? (
-            <p className="text-muted-foreground py-8 text-center">
-              {t("labels.loading")}
-            </p>
-          ) : users.length === 0 ? (
-            <p className="text-muted-foreground py-8 text-center">
-              {t("users.noUsers")}
-            </p>
+          {!loading && users.length === 0 ? (
+            <EmptyMount
+              icon={Users}
+              title={t("users.noUsers")}
+              hint="Crea il primo utente per dare accesso all'archivio."
+              className="py-10"
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -654,99 +661,146 @@ export default function UtentiPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">
-                      {u.name ?? "—"}
-                    </TableCell>
-                    <TableCell>{u.email}</TableCell>
-                    <TableCell>{u.phone ?? "—"}</TableCell>
-                    <TableCell>{roleBadge(u.role)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {u.otpChannel === "whatsapp" ? "WhatsApp" : "Email"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{statusBadge(u.active)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={() => openEdit(u)}
-                          title="Modifica"
-                        >
-                          <Pencil className="size-3.5" />
-                        </Button>
+                {loading
+                  ? Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <Skeleton className="h-4 w-24" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-40" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-24" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-5 w-16 rounded-4xl" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-5 w-14 rounded-4xl" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-5 w-14 rounded-4xl" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-16" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  : users.map((u) => (
+                      <Fragment key={u.id}>
+                        <TableRow>
+                          <TableCell className="font-medium">
+                            {u.name ?? "—"}
+                          </TableCell>
+                          <TableCell>{u.email}</TableCell>
+                          <TableCell>{u.phone ?? "—"}</TableCell>
+                          <TableCell>{roleBadge(u.role)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {u.otpChannel === "whatsapp"
+                                ? "WhatsApp"
+                                : "Email"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{statusBadge(u.active)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => openEdit(u)}
+                                aria-label={`Modifica ${u.name ?? u.email}`}
+                              >
+                                <Pencil className="size-3.5" />
+                              </Button>
 
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={() =>
-                            setExpandedUserId(
-                              expandedUserId === u.id ? null : u.id
-                            )
-                          }
-                          title="Chiavi API"
-                        >
-                          <Key className="size-3.5" />
-                        </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                className={cn(
+                                  expandedUserId === u.id &&
+                                    "bg-accent text-accent-foreground"
+                                )}
+                                aria-expanded={expandedUserId === u.id}
+                                aria-label={`Chiavi API di ${u.name ?? u.email}`}
+                                onClick={() =>
+                                  setExpandedUserId(
+                                    expandedUserId === u.id ? null : u.id
+                                  )
+                                }
+                              >
+                                <Key className="size-3.5" />
+                              </Button>
 
-                        {u.active && (
-                          <AlertDialog>
-                            <AlertDialogTrigger
-                              render={
-                                <Button
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  title="Disattiva"
-                                >
-                                  <ShieldAlert className="size-3.5 text-destructive" />
-                                </Button>
-                              }
-                            />
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Disattivare l&apos;utente?
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  L&apos;utente &quot;{u.name ?? u.email}&quot;
-                                  non potr&agrave; pi&ugrave; accedere al
-                                  sistema. Potrai riattivarlo in seguito.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
-                                <AlertDialogAction
-                                  variant="destructive"
-                                  onClick={() => deactivateUser(u.id)}
-                                >
-                                  Disattiva
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                              {u.active && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger
+                                    render={
+                                      <Button
+                                        variant="ghost"
+                                        size="icon-xs"
+                                        aria-label={`Disattiva ${u.name ?? u.email}`}
+                                      >
+                                        <ShieldAlert className="size-3.5 text-destructive" />
+                                      </Button>
+                                    }
+                                  />
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        Disattivare l&apos;utente?
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        L&apos;utente &quot;
+                                        {u.name ?? u.email}&quot; non
+                                        potr&agrave; pi&ugrave; accedere al
+                                        sistema. Potrai riattivarlo in seguito.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>
+                                        {t("actions.cancel")}
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        variant="destructive"
+                                        onClick={() => deactivateUser(u.id)}
+                                      >
+                                        Disattiva
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Inline API keys panel for the expanded user */}
+                        {expandedUserId === u.id && (
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableCell
+                              colSpan={USERS_TABLE_COLUMNS}
+                              className="p-4"
+                            >
+                              <UserApiKeys
+                                userId={u.id}
+                                userName={u.name}
+                                isSelf={
+                                  currentUser != null &&
+                                  String(currentUser.id) === String(u.id)
+                                }
+                              />
+                            </TableCell>
+                          </TableRow>
                         )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </Fragment>
+                    ))}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
-
-      {/* API Keys section for expanded user */}
-      {expandedUserId && (
-        <UserApiKeys
-          userId={expandedUserId}
-          userName={
-            users.find((u) => u.id === expandedUserId)?.name ?? null
-          }
-        />
-      )}
     </div>
   );
 }

@@ -10,7 +10,7 @@ import { DatePickerIt } from "@/components/date-picker-it";
 import { LocationPicker } from "@/components/location-picker";
 import { t } from "@/lib/i18n";
 
-interface MetadataFormValues {
+export interface MetadataFormValues {
   title: string;
   dateTaken: string;
   dateTakenPrecise: string | null;
@@ -22,7 +22,13 @@ interface MetadataFormProps {
   slideId: number;
   initialValues: MetadataFormValues;
   onSave?: (values: MetadataFormValues) => Promise<void>;
+  /** Called after a successful save so the parent can sync its slide state. */
+  onSaved?: (values: MetadataFormValues) => void;
   onExifWrite?: () => void;
+  /** Disables the "Scrivi EXIF" button while the write is in flight. */
+  exifWriting?: boolean;
+  /** Read-only variant: inputs disabled, save/EXIF buttons hidden. */
+  readOnly?: boolean;
   className?: string;
 }
 
@@ -32,7 +38,10 @@ export function MetadataForm({
   slideId,
   initialValues,
   onSave,
+  onSaved,
   onExifWrite,
+  exifWriting = false,
+  readOnly = false,
   className,
 }: MetadataFormProps) {
   const [values, setValues] = useState<MetadataFormValues>(initialValues);
@@ -40,12 +49,18 @@ export function MetadataForm({
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
   const prevValuesRef = useRef(initialValues);
 
-  // Reset when slide changes
+  // Keep the latest initialValues in a ref so the reset effect below can
+  // stay keyed on slideId only — resetting on every new initialValues
+  // object identity would wipe unsaved edits on any parent re-render.
+  const latestInitialValues = useRef(initialValues);
+  latestInitialValues.current = initialValues;
+
+  // Reset ONLY when the slide actually changes
   useEffect(() => {
-    setValues(initialValues);
-    prevValuesRef.current = initialValues;
+    setValues(latestInitialValues.current);
+    prevValuesRef.current = latestInitialValues.current;
     setSaveStatus("idle");
-  }, [slideId, initialValues]);
+  }, [slideId]);
 
   const doSave = useCallback(
     async (vals: MetadataFormValues) => {
@@ -68,6 +83,7 @@ export function MetadataForm({
           if (!res.ok) throw new Error("Errore nel salvataggio");
         }
         prevValuesRef.current = vals;
+        onSaved?.(vals);
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 2000);
       } catch {
@@ -75,7 +91,7 @@ export function MetadataForm({
         setTimeout(() => setSaveStatus("idle"), 3000);
       }
     },
-    [slideId, onSave]
+    [slideId, onSave, onSaved]
   );
 
   const handleChange = useCallback(
@@ -128,28 +144,37 @@ export function MetadataForm({
           value={values.title}
           onChange={(e) => handleChange("title", e.target.value)}
           placeholder={t("metadata.slideTitlePlaceholder")}
+          disabled={readOnly}
         />
       </div>
 
       {/* Date */}
       <div className="space-y-1.5">
-        <Label>Data</Label>
-        <DatePickerIt
-          value={values.dateTaken}
-          preciseValue={values.dateTakenPrecise}
-          onChange={handleDateChange}
-        />
+        <Label htmlFor="meta-date">Data</Label>
+        {readOnly ? (
+          <Input id="meta-date" value={values.dateTaken} disabled />
+        ) : (
+          <DatePickerIt
+            value={values.dateTaken}
+            preciseValue={values.dateTakenPrecise}
+            onChange={handleDateChange}
+          />
+        )}
       </div>
 
       {/* Location */}
       <div className="space-y-1.5">
         <Label htmlFor="meta-location">Luogo</Label>
-        <LocationPicker
-          id="meta-location"
-          value={values.location}
-          onChange={(v) => handleChange("location", v)}
-          placeholder="Cerca un luogo..."
-        />
+        {readOnly ? (
+          <Input id="meta-location" value={values.location} disabled />
+        ) : (
+          <LocationPicker
+            id="meta-location"
+            value={values.location}
+            onChange={(v) => handleChange("location", v)}
+            placeholder="Cerca un luogo..."
+          />
+        )}
       </div>
 
       {/* Notes */}
@@ -161,43 +186,54 @@ export function MetadataForm({
           onChange={(e) => handleChange("notes", e.target.value)}
           placeholder="Note aggiuntive..."
           rows={3}
+          disabled={readOnly}
         />
       </div>
 
       {/* Action buttons & status */}
-      <div className="flex items-center gap-2">
-        <Button onClick={handleManualSave} size="sm" disabled={saveStatus === "saving"}>
-          {saveStatus === "saving" ? (
-            <>
-              <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
-              {t("labels.saving")}
-            </>
-          ) : (
-            <>
-              <SaveIcon className="mr-1.5 size-3.5" />
-              {t("metadata.saveChanges")}
-            </>
-          )}
-        </Button>
-
-        {onExifWrite && (
-          <Button variant="outline" size="sm" onClick={onExifWrite}>
-            Scrivi EXIF
+      {!readOnly && (
+        <div className="flex items-center gap-2">
+          <Button onClick={handleManualSave} size="sm" disabled={saveStatus === "saving"}>
+            {saveStatus === "saving" ? (
+              <>
+                <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
+                {t("labels.saving")}
+              </>
+            ) : (
+              <>
+                <SaveIcon className="mr-1.5 size-3.5" />
+                {t("metadata.saveChanges")}
+              </>
+            )}
           </Button>
-        )}
 
-        {saveStatus === "saved" && (
-          <span className="flex items-center gap-1 text-xs text-green-600">
-            <CheckIcon className="size-3" />
-            Salvato
+          {onExifWrite && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onExifWrite}
+              disabled={exifWriting}
+            >
+              {exifWriting && (
+                <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
+              )}
+              Scrivi EXIF
+            </Button>
+          )}
+
+          <span role="status" aria-live="polite" className="text-xs">
+            {saveStatus === "saved" && (
+              <span className="flex items-center gap-1 text-success">
+                <CheckIcon className="size-3" />
+                Salvato
+              </span>
+            )}
+            {saveStatus === "error" && (
+              <span className="text-destructive">Errore nel salvataggio</span>
+            )}
           </span>
-        )}
-        {saveStatus === "error" && (
-          <span className="text-xs text-destructive">
-            Errore nel salvataggio
-          </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

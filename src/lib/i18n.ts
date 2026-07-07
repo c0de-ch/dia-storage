@@ -782,6 +782,8 @@ const translations = {
       "Da qui puoi caricare nuove immagini scansionate dal tuo Reflecta DigitDia, trascinandole o selezionandole dal computer.",
     galleria:
       "La galleria mostra tutte le diapositive pubblicate. Puoi visualizzarle tutte o per album, filtrarle per data, luogo o tag, e archiviarle nel backup.",
+    condivisi:
+      "Qui trovi le gallerie e gli album che altri utenti hanno condiviso con te. Puoi visualizzarli in sola lettura.",
     ricerca:
       "La ricerca ti permette di trovare diapositive per titolo, luogo, note o qualsiasi testo nei metadati, usando la ricerca full-text.",
     utenti:
@@ -807,6 +809,47 @@ const translations = {
     megabytes: "MB",
     gigabytes: "GB",
     terabytes: "TB",
+  },
+
+  // ---------------------------------------------------------------------------
+  // Dashboard (Panoramica)
+  // ---------------------------------------------------------------------------
+  dashboard: {
+    kicker: "Archivio di famiglia · 35 mm",
+    title: "Panoramica",
+    totalSlides: "Totale diapositive",
+    incoming: "In coda",
+    recent: "Ultime pubblicate",
+    upload: "Carica diapositive",
+    loadError: "Impossibile caricare la panoramica.",
+  },
+
+  // ---------------------------------------------------------------------------
+  // Sharing (galleria condivisa / condivisi con me)
+  // ---------------------------------------------------------------------------
+  sharing: {
+    kicker: "Archivio · Condivisioni",
+    title: "Condivisi con me",
+    subtitle: "Gallerie e album che altri utenti hanno condiviso con te · sola lettura",
+    galleries: "Gallerie",
+    albums: "Album",
+    galleryOf: "Galleria di {name}",
+    emptyTitle: "Niente di condiviso con te",
+    emptyHint: "Quando qualcuno condivide una galleria o un album, comparirà qui.",
+    loadError: "Impossibile caricare le condivisioni.",
+    shareGallery: "Condividi galleria",
+    dialogTitle: "Condividi la tua galleria",
+    dialogDescription:
+      "Dai a un utente registrato l'accesso in sola lettura a tutte le tue diapositive. Inserisci la sua email.",
+    sharedWith: "Condiviso con",
+    notSharedYet: "Non ancora condivisa con nessuno.",
+    sharedToast: "Galleria condivisa con {email}",
+    removeRecipient: "Rimuovi {email}",
+    browsingBanner: "Stai sfogliando la galleria di {name}",
+    browsingEyebrow: "Galleria condivisa · 35 mm",
+    readOnly: "Sola lettura",
+    backToShares: "Condivisi con me",
+    sharedEmptyHint: "Questa galleria non contiene ancora diapositive.",
   },
 
   // ---------------------------------------------------------------------------

@@ -1,9 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { toast } from "sonner";
 import { t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,12 +11,16 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageMasthead } from "@/components/page-masthead";
+import { EmptyMount, ErrorState } from "@/components/state-views";
+import { SlideCard, SlideCardSkeleton } from "@/components/slide-card";
 import {
   ImageIcon,
   InboxIcon,
   UploadIcon,
   GalleryHorizontalEndIcon,
 } from "lucide-react";
+import type { Slide } from "@/types/slide";
 
 interface DashboardStats {
   totalSlides: number;
@@ -26,67 +28,63 @@ interface DashboardStats {
   magazinesCount: number;
 }
 
-interface RecentSlide {
-  id: string;
-  title?: string;
-  thumbnailUrl?: string;
-  createdAt: string;
-}
-
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentSlides, setRecentSlides] = useState<RecentSlide[]>([]);
+  const [recentSlides, setRecentSlides] = useState<Slide[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const fetchDashboard = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const [statsRes, slidesRes] = await Promise.all([
+        fetch("/api/v1/dashboard/stats", { credentials: "include" }),
+        fetch(
+          "/api/v1/slides?status=active&limit=10&sortBy=createdAt&sortOrder=desc",
+          { credentials: "include" }
+        ),
+      ]);
+
+      if (!statsRes.ok || !slidesRes.ok) {
+        throw new Error(
+          `Risposta non valida (stats ${statsRes.status}, slides ${slidesRes.status})`
+        );
+      }
+
+      const statsData: DashboardStats = await statsRes.json();
+      const slidesData: { slides?: Slide[] } = await slidesRes.json();
+      setStats(statsData);
+      setRecentSlides(slidesData.slides ?? []);
+    } catch (err) {
+      console.error("Errore nel caricamento della dashboard:", err);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function fetchDashboard() {
-      try {
-        const [statsRes, slidesRes] = await Promise.all([
-          fetch("/api/v1/dashboard/stats", { credentials: "include" }),
-          fetch("/api/v1/slides?status=active&limit=10&sortBy=createdAt&sortOrder=desc", {
-            credentials: "include",
-          }),
-        ]);
-
-        if (statsRes.ok) {
-          const data = await statsRes.json();
-          setStats(data);
-        }
-
-        if (slidesRes.ok) {
-          const data = await slidesRes.json();
-          setRecentSlides(data.items ?? data.slides ?? []);
-        }
-      } catch (error) {
-        console.error("Errore nel caricamento della dashboard:", error);
-        toast.error("Impossibile caricare la dashboard. Riprova piu tardi.");
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchDashboard();
-  }, []);
+  }, [fetchDashboard]);
 
   const statCards = [
     {
-      label: "Totale diapositive",
-      value: stats?.totalSlides ?? 0,
+      label: t("dashboard.totalSlides"),
+      value: stats?.totalSlides,
       icon: ImageIcon,
-      color: "text-blue-600 dark:text-blue-400",
       href: "/galleria",
     },
     {
-      label: "In coda",
-      value: stats?.incomingCount ?? 0,
+      label: t("dashboard.incoming"),
+      value: stats?.incomingCount,
       icon: InboxIcon,
-      color: "text-amber-600 dark:text-amber-400",
       href: "/coda",
     },
     {
       label: t("nav.magazines"),
-      value: stats?.magazinesCount ?? 0,
+      value: stats?.magazinesCount,
       icon: GalleryHorizontalEndIcon,
-      color: "text-emerald-600 dark:text-emerald-400",
       // Magazines are browsable via the advanced-search filter
       href: "/ricerca?avanzata=1",
     },
@@ -94,108 +92,122 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Panoramica</h1>
-        <p className="text-muted-foreground">
-          {t("app.tagline")}
-        </p>
-      </div>
+      <PageMasthead
+        eyebrow={t("dashboard.kicker")}
+        title={t("dashboard.title")}
+        subtitle={t("app.tagline")}
+      />
 
-      {/* Stats cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {statCards.map((card) => (
-          <Link key={card.label} href={card.href} className="group">
-            <Card className="h-full transition-colors group-hover:border-primary">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardDescription>{card.label}</CardDescription>
-                <card.icon className={`size-5 ${card.color}`} />
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <Skeleton className="h-8 w-20" />
-                ) : (
-                  <p className="text-3xl font-bold tabular-nums">
-                    {card.value.toLocaleString("it-IT")}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-
-      {/* Quick actions */}
-      <div className="flex flex-wrap gap-3">
-        <Button nativeButton={false} render={<Link href="/caricamento" />}>
-          <UploadIcon />
-          Carica diapositive
-        </Button>
-        <Button variant="outline" nativeButton={false} render={<Link href="/galleria" />}>
-          <ImageIcon />
-          {t("gallery.browseGallery")}
-        </Button>
-      </div>
-
-      {/* Recent slides */}
-      <div>
-        <h2 className="mb-4 text-lg font-semibold">Ultime pubblicate</h2>
-        {loading ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-square rounded-lg" />
-            ))}
-          </div>
-        ) : recentSlides.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <ImageIcon className="mb-4 size-12 text-muted-foreground" />
-              <p className="text-lg font-medium">{t("empty.slides")}</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t("empty.slidesDescription")}
-              </p>
-              <Button
-                className="mt-4"
-                nativeButton={false}
-                render={<Link href="/caricamento" />}
-              >
-                <UploadIcon />
-                Carica diapositive
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {recentSlides.map((slide) => (
+      {error && !loading ? (
+        <ErrorState
+          message={t("dashboard.loadError")}
+          onRetry={fetchDashboard}
+        />
+      ) : (
+        <>
+          {/* Stats cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {statCards.map((card, i) => (
               <Link
-                key={slide.id}
-                href={`/galleria/${slide.id}`}
-                className="group relative aspect-square overflow-hidden rounded-lg border bg-muted transition-colors hover:border-primary"
+                key={card.href}
+                href={card.href}
+                className="group slide-reveal block h-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                style={{ animationDelay: `${60 + i * 60}ms` }}
               >
-                {slide.thumbnailUrl ? (
-                  <Image
-                    src={slide.thumbnailUrl}
-                    alt={slide.title ?? "Diapositiva"}
-                    fill
-                    sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
-                    className="object-cover transition-transform group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="flex size-full items-center justify-center">
-                    <ImageIcon className="size-8 text-muted-foreground" />
-                  </div>
-                )}
-                {slide.title && (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                    <p className="truncate text-xs text-white">
-                      {slide.title}
-                    </p>
-                  </div>
-                )}
+                <Card className="h-full transition-colors group-hover:border-primary group-focus-visible:border-primary">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardDescription className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {card.label}
+                    </CardDescription>
+                    <span
+                      className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-accent text-accent-foreground"
+                      aria-hidden
+                    >
+                      <card.icon className="size-4" />
+                    </span>
+                  </CardHeader>
+                  <CardContent>
+                    {loading || card.value === undefined ? (
+                      <Skeleton className="h-9 w-24" />
+                    ) : (
+                      <p className="font-mono text-3xl font-bold tabular-nums text-primary">
+                        {String(card.value).padStart(4, "0")}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
               </Link>
             ))}
           </div>
-        )}
-      </div>
+
+          {/* Quick actions */}
+          <div
+            className="slide-reveal flex flex-wrap gap-3"
+            style={{ animationDelay: "240ms" }}
+          >
+            <Button nativeButton={false} render={<Link href="/caricamento" />}>
+              <UploadIcon aria-hidden />
+              {t("dashboard.upload")}
+            </Button>
+          </div>
+
+          {/* Recent slides */}
+          <section>
+            <div
+              className="slide-reveal"
+              style={{ animationDelay: "300ms" }}
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="font-mono text-[11px] uppercase tracking-[0.35em] text-muted-foreground">
+                  {t("dashboard.recent")}
+                </h2>
+                <Link
+                  href="/galleria"
+                  className="rounded-sm text-xs text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {t("gallery.browseGallery")}
+                </Link>
+              </div>
+              <div className="film-sprockets my-3" aria-hidden />
+            </div>
+
+            {loading ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <SlideCardSkeleton key={i} />
+                ))}
+              </div>
+            ) : recentSlides.length === 0 ? (
+              <EmptyMount
+                icon={ImageIcon}
+                title={t("empty.slides")}
+                hint={t("empty.slidesDescription")}
+                action={
+                  <Button
+                    nativeButton={false}
+                    render={<Link href="/caricamento" />}
+                  >
+                    <UploadIcon aria-hidden />
+                    {t("dashboard.upload")}
+                  </Button>
+                }
+              />
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                {recentSlides.map((slide, i) => (
+                  <div
+                    key={slide.id}
+                    className="slide-reveal"
+                    style={{ animationDelay: `${Math.min(i * 40, 700)}ms` }}
+                  >
+                    <SlideCard slide={slide} selectable={false} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }

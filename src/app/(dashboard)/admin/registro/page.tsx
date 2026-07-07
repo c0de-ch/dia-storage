@@ -6,12 +6,7 @@ import { FileText, Filter, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -37,6 +33,9 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { PageMasthead } from "@/components/page-masthead";
+import { StatusBadge } from "@/components/status-badge";
+import { EmptyMount } from "@/components/state-views";
 import { t } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
@@ -80,41 +79,25 @@ const ACTION_TYPES = [
 ];
 
 function actionBadge(action: string) {
-  if (action.startsWith("login") || action.startsWith("logout")) {
-    return (
-      <Badge className="bg-blue-600 text-white hover:bg-blue-700">
-        {actionLabel(action)}
-      </Badge>
-    );
-  }
-  if (action.includes("create") || action.includes("upload")) {
-    return (
-      <Badge className="bg-green-600 text-white hover:bg-green-700">
-        {actionLabel(action)}
-      </Badge>
-    );
-  }
-  if (action.includes("update") || action.includes("config")) {
-    return (
-      <Badge className="bg-yellow-600 text-white hover:bg-yellow-700">
-        {actionLabel(action)}
-      </Badge>
-    );
-  }
   if (
     action.includes("delete") ||
     action.includes("deactivate") ||
     action.includes("revoke") ||
     action.includes("failed")
   ) {
-    return <Badge variant="destructive">{actionLabel(action)}</Badge>;
+    return <StatusBadge tone="destructive">{actionLabel(action)}</StatusBadge>;
+  }
+  if (action.startsWith("login") || action.startsWith("logout")) {
+    return <StatusBadge tone="info">{actionLabel(action)}</StatusBadge>;
+  }
+  if (action.includes("create") || action.includes("upload")) {
+    return <StatusBadge tone="success">{actionLabel(action)}</StatusBadge>;
+  }
+  if (action.includes("update") || action.includes("config")) {
+    return <StatusBadge tone="warning">{actionLabel(action)}</StatusBadge>;
   }
   if (action.includes("backup")) {
-    return (
-      <Badge className="bg-purple-600 text-white hover:bg-purple-700">
-        {actionLabel(action)}
-      </Badge>
-    );
+    return <StatusBadge tone="accent">{actionLabel(action)}</StatusBadge>;
   }
   return <Badge variant="secondary">{actionLabel(action)}</Badge>;
 }
@@ -158,7 +141,22 @@ export default function RegistroPage() {
   const [actionFilter, setActionFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  // Debounced copies of the date inputs: typing in the native date fields
+  // fires onChange per keystroke, so the fetch keys off these instead.
+  const [debouncedFrom, setDebouncedFrom] = useState("");
+  const [debouncedTo, setDebouncedTo] = useState("");
   const limit = 20;
+
+  useEffect(() => {
+    if (debouncedFrom === dateFrom && debouncedTo === dateTo) return;
+    const timer = setTimeout(() => {
+      // Batched: one re-render, one fetch, back on page 1 with new filters.
+      setDebouncedFrom(dateFrom);
+      setDebouncedTo(dateTo);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [dateFrom, dateTo, debouncedFrom, debouncedTo]);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -168,8 +166,8 @@ export default function RegistroPage() {
         limit: String(limit),
       });
       if (actionFilter) params.set("action", actionFilter);
-      if (dateFrom) params.set("from", dateFrom);
-      if (dateTo) params.set("to", dateTo);
+      if (debouncedFrom) params.set("from", debouncedFrom);
+      if (debouncedTo) params.set("to", debouncedTo);
 
       const res = await fetch(`/api/v1/audit-log?${params.toString()}`);
       const data = await res.json();
@@ -182,43 +180,38 @@ export default function RegistroPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, actionFilter, dateFrom, dateTo]);
+  }, [page, actionFilter, debouncedFrom, debouncedTo]);
 
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
 
-  function applyFilters() {
-    setPage(1);
-    fetchLogs();
-  }
-
   function resetFilters() {
     setActionFilter("");
     setDateFrom("");
     setDateTo("");
+    setDebouncedFrom("");
+    setDebouncedTo("");
     setPage(1);
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Registro attivit&agrave;
-          </h1>
-          <p className="text-muted-foreground">
-            Cronologia di tutte le azioni eseguite nel sistema.
-          </p>
-        </div>
-        <Button variant="outline" onClick={fetchLogs}>
-          <RefreshCw className="size-4 mr-1.5" />
-          Aggiorna
-        </Button>
-      </div>
+      <PageMasthead
+        size="md"
+        eyebrow="Amministrazione"
+        title={t("auditLog.title")}
+        subtitle="Cronologia di tutte le azioni eseguite nel sistema."
+        action={
+          <Button variant="outline" onClick={fetchLogs}>
+            <RefreshCw className="size-4 mr-1.5" />
+            {t("actions.refresh")}
+          </Button>
+        }
+      />
 
       {/* Filters */}
-      <Card>
+      <Card className="slide-reveal" style={{ animationDelay: "60ms" }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sm">
             <Filter className="size-4" />
@@ -232,7 +225,10 @@ export default function RegistroPage() {
               <Select
                 value={actionFilter || "__all__"}
                 onValueChange={(v) => {
-                  if (v) setActionFilter(v === "__all__" ? "" : v);
+                  if (v) {
+                    setActionFilter(v === "__all__" ? "" : v);
+                    setPage(1);
+                  }
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -271,7 +267,6 @@ export default function RegistroPage() {
               />
             </div>
 
-            <Button onClick={applyFilters}>Filtra</Button>
             <Button variant="outline" onClick={resetFilters}>
               Resetta
             </Button>
@@ -279,22 +274,19 @@ export default function RegistroPage() {
         </CardContent>
       </Card>
 
-      {/* Log table */}
-      <Card>
+      {/* Log table: mono "contact sheet" */}
+      <Card className="slide-reveal" style={{ animationDelay: "120ms" }}>
         <CardContent className="pt-4">
-          {loading ? (
-            <p className="text-muted-foreground py-8 text-center">
-              {t("labels.loading")}
-            </p>
-          ) : entries.length === 0 ? (
-            <div className="py-8 text-center">
-              <FileText className="mx-auto mb-2 size-8 text-muted-foreground" />
-              <p className="text-muted-foreground">
-                Nessuna voce nel registro per i filtri selezionati.
-              </p>
-            </div>
+          {!loading && entries.length === 0 ? (
+            <EmptyMount
+              icon={FileText}
+              title={t("auditLog.noEntries")}
+              hint="Prova a modificare i filtri selezionati."
+              className="py-10"
+            />
           ) : (
             <>
+              <div className="film-sprockets mb-2 opacity-40" aria-hidden />
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -306,39 +298,66 @@ export default function RegistroPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {entries.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell className="text-xs">
-                        {new Date(entry.createdAt).toLocaleString("it-IT")}
-                      </TableCell>
-                      <TableCell>
-                        {entry.user?.name ??
-                          entry.user?.email ??
-                          (entry.userId
-                            ? `Utente #${entry.userId}`
-                            : "Sistema")}
-                      </TableCell>
-                      <TableCell>{actionBadge(entry.action)}</TableCell>
-                      <TableCell>
-                        {entityTypeLabel(entry.entityType)}
-                        {entry.entityId && (
-                          <span className="ml-1 text-xs text-muted-foreground">
-                            #{entry.entityId}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[300px] truncate text-xs text-muted-foreground">
-                        {entry.details
-                          ? JSON.stringify(entry.details)
-                          : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {loading
+                    ? Array.from({ length: 5 }).map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell>
+                            <Skeleton className="h-4 w-32" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-28" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-5 w-24 rounded-4xl" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-20" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-40" />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    : entries.map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell className="font-mono text-xs tabular-nums whitespace-nowrap">
+                            {new Date(entry.createdAt).toLocaleString("it-IT")}
+                          </TableCell>
+                          <TableCell>
+                            {entry.user?.name ??
+                              entry.user?.email ??
+                              (entry.userId
+                                ? `Utente #${entry.userId}`
+                                : "Sistema")}
+                          </TableCell>
+                          <TableCell>{actionBadge(entry.action)}</TableCell>
+                          <TableCell>
+                            {entityTypeLabel(entry.entityType)}
+                            {entry.entityId && (
+                              <span className="ml-1 font-mono text-xs text-muted-foreground">
+                                #{entry.entityId}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell
+                            className="max-w-[300px] truncate font-mono text-[11px] text-muted-foreground"
+                            title={
+                              entry.details
+                                ? JSON.stringify(entry.details, null, 2)
+                                : undefined
+                            }
+                          >
+                            {entry.details
+                              ? JSON.stringify(entry.details)
+                              : "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                 </TableBody>
               </Table>
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {!loading && totalPages > 1 && (
                 <div className="mt-4">
                   <Pagination>
                     <PaginationContent>
@@ -347,6 +366,7 @@ export default function RegistroPage() {
                           text="Precedente"
                           onClick={() => setPage(Math.max(1, page - 1))}
                           aria-disabled={page <= 1}
+                          tabIndex={page <= 1 ? -1 : 0}
                           className={
                             page <= 1
                               ? "pointer-events-none opacity-50"
@@ -388,6 +408,7 @@ export default function RegistroPage() {
                             setPage(Math.min(totalPages, page + 1))
                           }
                           aria-disabled={page >= totalPages}
+                          tabIndex={page >= totalPages ? -1 : 0}
                           className={
                             page >= totalPages
                               ? "pointer-events-none opacity-50"
