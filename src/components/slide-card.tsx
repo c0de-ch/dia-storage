@@ -16,6 +16,8 @@ interface SlideCardProps {
   selected?: boolean;
   onSelect?: (id: number, selected: boolean) => void;
   showCheckbox?: boolean;
+  /** false hides the selection affordance entirely (e.g. read-only shared galleries) */
+  selectable?: boolean;
 }
 
 /**
@@ -28,6 +30,7 @@ export const SlideCard = memo(function SlideCard({
   selected = false,
   onSelect,
   showCheckbox = false,
+  selectable = true,
 }: SlideCardProps) {
   const router = useRouter();
 
@@ -43,6 +46,14 @@ export const SlideCard = memo(function SlideCard({
     router.push(`/galleria/${slide.id}`);
   }
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      router.push(`/galleria/${slide.id}`);
+    }
+  }
+
   function handleCheckboxChange(checked: boolean) {
     onSelect?.(slide.id, checked);
   }
@@ -56,30 +67,42 @@ export const SlideCard = memo(function SlideCard({
 
   return (
     <div
+      data-slot="card"
+      role="button"
+      tabIndex={0}
+      aria-label={displayTitle}
       className={cn(
         "group/slide relative cursor-pointer rounded-sm border bg-card p-2 shadow-sm",
         "transition-all duration-300 ease-out",
         "hover:-translate-y-1 hover:shadow-lg hover:ring-2 hover:ring-ring/40",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         selected && "-translate-y-1 ring-2 ring-primary shadow-lg"
       )}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
     >
       {/* Checkbox overlay */}
-      <div
-        className={cn(
-          "absolute top-3.5 left-3.5 z-10 transition-opacity",
-          showCheckbox || selected
-            ? "opacity-100"
-            : "opacity-0 group-hover/slide:opacity-100"
-        )}
-      >
+      {selectable && (
         <div
-          className="rounded bg-background/80 p-1 backdrop-blur-sm"
-          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "absolute top-3.5 left-3.5 z-10 transition-opacity",
+            showCheckbox || selected
+              ? "opacity-100"
+              : "opacity-0 group-hover/slide:opacity-100 group-focus-within/slide:opacity-100"
+          )}
         >
-          <Checkbox checked={selected} onCheckedChange={handleCheckboxChange} />
+          <div
+            className="rounded bg-background/80 p-1 backdrop-blur-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Checkbox
+              checked={selected}
+              onCheckedChange={handleCheckboxChange}
+              aria-label={`Seleziona ${displayTitle}`}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Status badge */}
       {slide.status !== "active" && (
@@ -152,7 +175,7 @@ function ThumbnailImage({ slideId, alt }: { slideId: number; alt: string }) {
 
 export function SlideCardSkeleton() {
   return (
-    <div className="rounded-sm border bg-card p-2 shadow-sm">
+    <div data-slot="card" className="rounded-sm border bg-card p-2 shadow-sm">
       <Skeleton className="aspect-[3/2] w-full rounded-[3px]" />
       <div className="space-y-1 px-0.5 pt-1.5 pb-0.5">
         <Skeleton className="h-3 w-3/4" />

@@ -8,10 +8,21 @@ import { toast } from "sonner";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HelpPopover } from "@/components/help-popover";
+import { PageMasthead } from "@/components/page-masthead";
+import { EmptyMount, ErrorState } from "@/components/state-views";
+import { SlideCard, SlideCardSkeleton } from "@/components/slide-card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +40,7 @@ import {
 import { Input } from "@/components/ui/input";
 import {
   ArrowLeftIcon,
+  CheckIcon,
   FolderInputIcon,
   ImageIcon,
   LibraryIcon,
@@ -68,6 +80,7 @@ export default function AlbumDetailPage() {
   const [allAlbums, setAllAlbums] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
+  const [errored, setErrored] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
 
@@ -77,50 +90,74 @@ export default function AlbumDetailPage() {
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [adding, setAdding] = useState(false);
 
+  // Rename / delete (themed dialogs instead of native prompt()/confirm())
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameName, setRenameName] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // Sharing
   const [shareOpen, setShareOpen] = useState(false);
   const [shares, setShares] = useState<ShareEntry[]>([]);
+  const [loadingShares, setLoadingShares] = useState(false);
   const [shareEmail, setShareEmail] = useState("");
   const [sharing, setSharing] = useState(false);
 
   const canManage = album?.access !== "shared";
 
   const load = useCallback(async () => {
+    setMissing(false);
+    setErrored(false);
     try {
       const [cRes, listRes] = await Promise.all([
         fetch(`/api/v1/collections/${albumId}`, { credentials: "include" }),
         fetch(`/api/v1/collections?limit=100`, { credentials: "include" }),
       ]);
-      if (!cRes.ok) {
+      if (cRes.status === 404 || cRes.status === 403) {
+        // The album really does not exist (or is no longer shared with us).
         setMissing(true);
+        return;
+      }
+      if (!cRes.ok) {
+        // Server / transient failure: show a retryable error, not "not found".
+        setErrored(true);
         return;
       }
       const cData = await cRes.json();
       const coll = cData.collection as Album;
       // Default the cover to the first photo if none is set yet, so the album
-      // card shows a thumbnail.
+      // card shows a thumbnail. Owners only: shared viewers cannot PATCH.
       const firstSlide = coll.slides?.[0];
       if (!coll.coverSlideId && firstSlide) {
         coll.coverSlideId = firstSlide.id;
-        fetch(`/api/v1/collections/${albumId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ coverSlideId: firstSlide.id }),
-          credentials: "include",
-        }).catch(() => {});
+        if (coll.access !== "shared") {
+          fetch(`/api/v1/collections/${albumId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ coverSlideId: firstSlide.id }),
+            credentials: "include",
+          }).catch(() => {});
+        }
       }
       setAlbum(coll);
       if (listRes.ok) {
         const lData = await listRes.json();
+        // Only albums the user owns: albums shared with them are read-only,
+        // so they can never be a move target.
         setAllAlbums(
-          (lData.collections ?? []).map((c: { id: number; name: string }) => ({
-            id: c.id,
-            name: c.name,
-          }))
+          (lData.collections ?? [])
+            .filter(
+              (c: { id: number; name: string; shared?: boolean }) => !c.shared
+            )
+            .map((c: { id: number; name: string }) => ({
+              id: c.id,
+              name: c.name,
+            }))
         );
       }
     } catch {
-      setMissing(true);
+      setErrored(true);
     } finally {
       setLoading(false);
     }
@@ -130,48 +167,66 @@ export default function AlbumDetailPage() {
     if (albumId) load();
   }, [albumId, load]);
 
-  function toggle(id: number) {
+  const handleSelect = useCallback((id: number, isSelected: boolean) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (isSelected) next.add(id);
+      else next.delete(id);
       return next;
     });
+  }, []);
+
+  function openRename() {
+    setRenameName(album?.name ?? "");
+    setRenameOpen(true);
   }
 
-  async function rename() {
-    const name = prompt("Nuovo nome dell'album:", album?.name ?? "");
-    if (!name || !name.trim()) return;
-    const res = await fetch(`/api/v1/collections/${albumId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim() }),
-      credentials: "include",
-    });
-    if (res.ok) {
-      setAlbum((a) => (a ? { ...a, name: name.trim() } : a));
-      toast.success(t("success.collectionUpdated"));
-    } else {
+  async function submitRename(e: React.FormEvent) {
+    e.preventDefault();
+    const name = renameName.trim();
+    if (!name || renaming) return;
+    setRenaming(true);
+    try {
+      const res = await fetch(`/api/v1/collections/${albumId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+        credentials: "include",
+      });
+      if (res.ok) {
+        setAlbum((a) => (a ? { ...a, name } : a));
+        toast.success(t("success.collectionUpdated"));
+        setRenameOpen(false);
+      } else {
+        toast.error(t("errors.generic"));
+      }
+    } catch {
       toast.error(t("errors.generic"));
+    } finally {
+      setRenaming(false);
     }
   }
 
   async function deleteAlbum() {
-    if (
-      !window.confirm(
-        `Eliminare l'album "${album?.name}"? Le foto NON verranno eliminate.`
-      )
-    )
-      return;
-    const res = await fetch(`/api/v1/collections/${albumId}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    if (res.ok) {
-      toast.success(t("success.collectionDeleted"));
-      router.push("/galleria?view=albums");
-    } else {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/v1/collections/${albumId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        toast.success(t("success.collectionDeleted"));
+        router.push("/galleria?view=albums");
+        return;
+      }
       toast.error(t("errors.generic"));
+      setDeleteOpen(false);
+    } catch {
+      toast.error(t("errors.generic"));
+      setDeleteOpen(false);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -194,15 +249,32 @@ export default function AlbumDetailPage() {
   async function removeSelected() {
     if (selected.size === 0) return;
     setBusy(true);
-    for (const id of [...selected]) {
-      await fetch(`/api/v1/collections/${albumId}/slides?slideId=${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      }).catch(() => {});
+    const ids = [...selected];
+    let failed = 0;
+    for (const id of ids) {
+      try {
+        const res = await fetch(
+          `/api/v1/collections/${albumId}/slides?slideId=${id}`,
+          { method: "DELETE", credentials: "include" }
+        );
+        if (!res.ok) failed++;
+      } catch {
+        failed++;
+      }
     }
     setSelected(new Set());
     setBusy(false);
-    toast.success("Foto rimosse dall'album");
+    if (failed === 0) {
+      toast.success(
+        ids.length === 1 ? "Foto rimossa dall'album" : "Foto rimosse dall'album"
+      );
+    } else if (failed === ids.length) {
+      toast.error("Nessuna foto rimossa. Riprova.");
+    } else {
+      toast.warning(
+        `Rimosse ${ids.length - failed} foto su ${ids.length}. Riprova per le restanti.`
+      );
+    }
     load();
   }
 
@@ -210,28 +282,56 @@ export default function AlbumDetailPage() {
     if (selected.size === 0) return;
     setBusy(true);
     const ids = [...selected];
-    // Add to the target album, then remove from this one.
-    await fetch(`/api/v1/collections/${targetId}/slides`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slideIds: ids }),
-      credentials: "include",
-    }).catch(() => {});
-    for (const id of ids) {
-      await fetch(`/api/v1/collections/${albumId}/slides?slideId=${id}`, {
-        method: "DELETE",
+    // Add to the target album first; abort if that fails so the photos are
+    // never removed from this album without landing in the other one.
+    let added = false;
+    try {
+      const res = await fetch(`/api/v1/collections/${targetId}/slides`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slideIds: ids }),
         credentials: "include",
-      }).catch(() => {});
+      });
+      added = res.ok;
+    } catch {
+      added = false;
+    }
+    if (!added) {
+      setBusy(false);
+      toast.error("Spostamento non riuscito. Riprova.");
+      return;
+    }
+    let failed = 0;
+    for (const id of ids) {
+      try {
+        const res = await fetch(
+          `/api/v1/collections/${albumId}/slides?slideId=${id}`,
+          { method: "DELETE", credentials: "include" }
+        );
+        if (!res.ok) failed++;
+      } catch {
+        failed++;
+      }
     }
     setSelected(new Set());
     setBusy(false);
-    toast.success("Foto spostate");
+    if (failed === 0) {
+      toast.success(ids.length === 1 ? "Foto spostata" : "Foto spostate");
+    } else {
+      toast.warning(
+        `Foto aggiunte all'altro album, ma ${failed} su ${ids.length} non sono state rimosse da questo.`
+      );
+    }
     load();
   }
 
   async function openShare() {
     setShareOpen(true);
     setShareEmail("");
+    // Reset the previous list so it never flashes stale entries, and show a
+    // spinner until the fetch resolves.
+    setShares([]);
+    setLoadingShares(true);
     try {
       const res = await fetch(`/api/v1/collections/${albumId}/shares`, {
         credentials: "include",
@@ -242,6 +342,8 @@ export default function AlbumDetailPage() {
       }
     } catch {
       setShares([]);
+    } finally {
+      setLoadingShares(false);
     }
   }
 
@@ -316,78 +418,113 @@ export default function AlbumDetailPage() {
       return;
     }
     setAdding(true);
-    const res = await fetch(`/api/v1/collections/${albumId}/slides`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slideIds: [...addSelected] }),
-      credentials: "include",
-    });
-    setAdding(false);
-    if (res.ok) {
-      toast.success("Foto aggiunte");
-      setAddOpen(false);
-      load();
-    } else {
+    try {
+      const res = await fetch(`/api/v1/collections/${albumId}/slides`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slideIds: [...addSelected] }),
+        credentials: "include",
+      });
+      if (res.ok) {
+        toast.success("Foto aggiunte");
+        setAddOpen(false);
+        load();
+      } else {
+        toast.error(t("errors.generic"));
+      }
+    } catch {
       toast.error(t("errors.generic"));
+    } finally {
+      setAdding(false);
     }
   }
 
   const otherAlbums = allAlbums.filter((a) => a.id !== albumId);
   const slides = album?.slides ?? [];
 
+  const backButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="w-fit"
+      nativeButton={false}
+      render={<Link href="/galleria?view=albums" />}
+    >
+      <ArrowLeftIcon />
+      {t("gallery.albums")}
+    </Button>
+  );
+
   if (loading) {
     return (
-      <div className="flex flex-col gap-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <Skeleton key={i} className="aspect-square rounded-md" />
+      <div className="flex flex-col gap-4">
+        <div>
+          <Skeleton className="h-3 w-44" />
+          <Skeleton className="mt-2 h-10 w-72" />
+          <div className="film-sprockets mt-3" aria-hidden />
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <SlideCardSkeleton key={i} />
           ))}
         </div>
       </div>
     );
   }
 
+  if (errored) {
+    return (
+      <div className="flex flex-col gap-4">
+        {backButton}
+        <ErrorState
+          message="Errore di caricamento dell'album"
+          onRetry={() => {
+            setLoading(true);
+            load();
+          }}
+        />
+      </div>
+    );
+  }
+
   if (missing || !album) {
     return (
-      <div className="flex flex-col gap-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-fit"
-          nativeButton={false}
-          render={<Link href="/galleria?view=albums" />}
-        >
-          <ArrowLeftIcon />
-          {t("gallery.albums")}
-        </Button>
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <LibraryIcon className="mb-4 size-12 text-muted-foreground" />
-            <p className="text-lg font-medium">{t("errors.collectionNotFound")}</p>
-          </CardContent>
-        </Card>
+      <div className="flex flex-col gap-4">
+        {backButton}
+        <EmptyMount
+          icon={LibraryIcon}
+          title={t("errors.collectionNotFound")}
+          hint="L'album potrebbe essere stato eliminato o non essere più condiviso con te."
+        />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-fit"
-            nativeButton={false}
-            render={<Link href="/galleria?view=albums" />}
-          >
-            <ArrowLeftIcon />
-            {t("gallery.albums")}
-          </Button>
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-2xl font-bold tracking-tight">{album.name}</h1>
-            {canManage && (
+    <div className="flex flex-col gap-4">
+      {backButton}
+
+      <PageMasthead
+        eyebrow="Album · Archivio 35 mm"
+        title={album.name}
+        count={slides.length}
+        countLabel="foto"
+        subtitle={
+          !canManage || album.description ? (
+            <span className="inline-flex flex-wrap items-center gap-2">
+              {!canManage && (
+                <span className="inline-flex items-center gap-1 rounded-sm border border-primary/40 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] text-primary">
+                  <UsersIcon className="size-3" />
+                  Condiviso con te
+                </span>
+              )}
+              {album.description}
+            </span>
+          ) : undefined
+        }
+        action={
+          canManage ? (
+            <div className="flex flex-wrap items-center gap-2">
               <HelpPopover
                 items={[
                   "Clicca una foto per aprirla.",
@@ -397,168 +534,148 @@ export default function AlbumDetailPage() {
                   "«Condividi» dà accesso in sola lettura a un altro utente registrato.",
                 ]}
               />
-            )}
-          </div>
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            {slides.length === 1 ? "1 foto" : `${slides.length} foto`}
-            {!canManage && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-                <UsersIcon className="size-3" />
-                Condiviso con te
-              </span>
-            )}
-          </p>
-        </div>
-        {canManage && (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={openAdd}>
-              <PlusIcon />
-              Aggiungi foto
-            </Button>
-            <Button variant="outline" size="sm" onClick={openShare}>
-              <Share2Icon />
-              Condividi
-            </Button>
-            <Button variant="outline" size="sm" onClick={rename}>
-              <PencilIcon />
-              Rinomina
-            </Button>
-            <Button variant="destructive" size="sm" onClick={deleteAlbum}>
-              <Trash2Icon />
-              {t("actions.delete")}
-            </Button>
-          </div>
-        )}
-      </div>
+              <Button variant="outline" size="sm" onClick={openAdd}>
+                <PlusIcon />
+                Aggiungi foto
+              </Button>
+              <Button variant="outline" size="sm" onClick={openShare}>
+                <Share2Icon />
+                {t("actions.share")}
+              </Button>
+              <Button variant="outline" size="sm" onClick={openRename}>
+                <PencilIcon />
+                {t("actions.rename")}
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2Icon />
+                {t("actions.delete")}
+              </Button>
+            </div>
+          ) : undefined
+        }
+      />
 
-      {/* Selection toolbar (owner only) */}
+      {/* Selection toolbar (owner only) — sticky so bulk actions survive scroll */}
       {canManage && slides.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setSelected((prev) =>
-                prev.size === slides.length
-                  ? new Set()
-                  : new Set(slides.map((s) => s.id))
-              )
-            }
-          >
-            {selected.size === slides.length
-              ? "Deseleziona tutte"
-              : "Seleziona tutte"}
-          </Button>
-          {selected.size > 0 && (
-            <>
-              <span className="text-xs text-muted-foreground">
-                {selected.size} selezionate
-              </span>
-              {selected.size === 1 && (
+        <>
+          <div className="sticky top-0 z-20 -mx-1 flex flex-wrap items-center gap-2 rounded-md bg-background/90 px-1 py-1.5 backdrop-blur-sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setSelected((prev) =>
+                  prev.size === slides.length
+                    ? new Set()
+                    : new Set(slides.map((s) => s.id))
+                )
+              }
+            >
+              {selected.size === slides.length
+                ? "Deseleziona tutte"
+                : "Seleziona tutte"}
+            </Button>
+            {selected.size > 0 && (
+              <>
+                <span className="font-mono text-[11px] uppercase tracking-wider tabular-nums text-muted-foreground">
+                  {String(selected.size).padStart(3, "0")} selezionate
+                </span>
+                {selected.size === 1 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => setCover([...selected][0]!)}
+                  >
+                    <ImageIcon />
+                    Imposta copertina
+                  </Button>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button variant="outline" size="sm" disabled={busy}>
+                        <FolderInputIcon />
+                        Sposta in
+                      </Button>
+                    }
+                  />
+                  <DropdownMenuContent>
+                    {otherAlbums.length === 0 ? (
+                      <DropdownMenuItem disabled>
+                        Nessun altro album
+                      </DropdownMenuItem>
+                    ) : (
+                      otherAlbums.map((a) => (
+                        <DropdownMenuItem
+                          key={a.id}
+                          onClick={() => moveSelected(a.id)}
+                        >
+                          {a.name}
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={busy}
-                  onClick={() => setCover([...selected][0]!)}
+                  onClick={removeSelected}
                 >
-                  <ImageIcon />
-                  Imposta copertina
+                  <Trash2Icon />
+                  Rimuovi
                 </Button>
-              )}
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <Button variant="outline" size="sm" disabled={busy}>
-                      <FolderInputIcon />
-                      Sposta in
-                    </Button>
-                  }
-                />
-                <DropdownMenuContent>
-                  {otherAlbums.length === 0 ? (
-                    <DropdownMenuItem disabled>
-                      Nessun altro album
-                    </DropdownMenuItem>
-                  ) : (
-                    otherAlbums.map((a) => (
-                      <DropdownMenuItem
-                        key={a.id}
-                        onClick={() => moveSelected(a.id)}
-                      >
-                        {a.name}
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={removeSelected}
-              >
-                <Trash2Icon />
-                Rimuovi
-              </Button>
-              {busy && <Loader2Icon className="size-4 animate-spin" />}
-            </>
-          )}
-        </div>
+                {busy && <Loader2Icon className="size-4 animate-spin" />}
+              </>
+            )}
+          </div>
+          <div className="film-sprockets" aria-hidden />
+        </>
       )}
 
       {/* Photo grid */}
       {slides.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <ImageIcon className="mb-4 size-12 text-muted-foreground" />
-            <p className="text-lg font-medium">Album vuoto</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Usa &laquo;Aggiungi foto&raquo; per popolarlo.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyMount
+          icon={ImageIcon}
+          title="Album vuoto"
+          hint={
+            canManage
+              ? "Usa «Aggiungi foto» per popolarlo."
+              : "Questo album non contiene ancora foto."
+          }
+          action={
+            canManage ? (
+              <Button variant="outline" size="sm" onClick={openAdd}>
+                <PlusIcon />
+                Aggiungi foto
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
-          {slides.map((slide) => (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {slides.map((slide, i) => (
             <div
               key={slide.id}
-              className={cn(
-                "group/thumb relative aspect-square overflow-hidden rounded-md border bg-muted transition-all",
-                selected.has(slide.id) && "ring-2 ring-primary"
-              )}
+              className="slide-reveal relative"
+              style={{ animationDelay: `${Math.min(i, 20) * 35}ms` }}
             >
-              {canManage && (
-                <div
-                  className={cn(
-                    "absolute top-1.5 left-1.5 z-10 transition-opacity",
-                    selected.has(slide.id)
-                      ? "opacity-100"
-                      : "opacity-0 group-hover/thumb:opacity-100"
-                  )}
-                >
-                  <div className="rounded bg-background/80 p-0.5 backdrop-blur-sm">
-                    <Checkbox
-                      checked={selected.has(slide.id)}
-                      onCheckedChange={() => toggle(slide.id)}
-                    />
-                  </div>
-                </div>
-              )}
               {album.coverSlideId === slide.id && (
-                <span className="absolute top-1.5 right-1.5 z-10 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
+                <span className="pointer-events-none absolute top-3.5 right-3.5 z-10 rounded-sm bg-primary/90 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary-foreground">
                   Copertina
                 </span>
               )}
-              <Link href={`/galleria/${slide.id}`} className="block size-full">
-                <Image
-                  src={`/api/v1/slides/${slide.id}/thumbnail`}
-                  alt={slide.title ?? slide.originalFilename ?? "Diapositiva"}
-                  fill
-                  sizes="(max-width: 640px) 33vw, (max-width: 1024px) 25vw, 16vw"
-                  className="object-cover"
-                  loading="lazy"
-                />
-              </Link>
+              <SlideCard
+                slide={slide}
+                selected={selected.has(slide.id)}
+                onSelect={handleSelect}
+                showCheckbox={canManage && selected.size > 0}
+                selectable={canManage}
+              />
             </div>
           ))}
         </div>
@@ -590,6 +707,7 @@ export default function AlbumDetailPage() {
                     <button
                       type="button"
                       key={slide.id}
+                      aria-pressed={isSel}
                       onClick={() =>
                         setAddSelected((prev) => {
                           const next = new Set(prev);
@@ -599,20 +717,28 @@ export default function AlbumDetailPage() {
                         })
                       }
                       className={cn(
-                        "relative aspect-square overflow-hidden rounded-md border bg-muted",
+                        "relative rounded-sm border bg-card p-1 text-left transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                         isSel && "ring-2 ring-primary"
                       )}
                     >
-                      <Image
-                        src={`/api/v1/slides/${slide.id}/thumbnail`}
-                        alt={slide.title ?? slide.originalFilename ?? "Diapositiva"}
-                        fill
-                        sizes="16vw"
-                        className="object-cover"
-                        loading="lazy"
-                      />
+                      <div className="relative aspect-[3/2] overflow-hidden rounded-[3px] bg-muted">
+                        <Image
+                          src={`/api/v1/slides/${slide.id}/thumbnail`}
+                          alt={slide.title ?? slide.originalFilename ?? "Diapositiva"}
+                          fill
+                          sizes="16vw"
+                          className="object-cover"
+                          loading="lazy"
+                        />
+                        <div
+                          className="pointer-events-none absolute inset-0 rounded-[3px] shadow-[inset_0_0_6px_rgba(0,0,0,0.35)]"
+                          aria-hidden
+                        />
+                      </div>
                       {isSel && (
-                        <div className="absolute inset-0 bg-primary/20" />
+                        <span className="absolute top-1.5 right-1.5 z-10 rounded-full bg-primary p-0.5 text-primary-foreground">
+                          <CheckIcon className="size-3" />
+                        </span>
                       )}
                     </button>
                   );
@@ -631,6 +757,63 @@ export default function AlbumDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rename dialog */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rinomina album</DialogTitle>
+            <DialogDescription>
+              Scegli un nuovo nome per &laquo;{album.name}&raquo;.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitRename} className="flex flex-col gap-4">
+            <Input
+              value={renameName}
+              onChange={(e) => setRenameName(e.target.value)}
+              placeholder={t("collections.collectionNamePlaceholder")}
+              autoFocus
+            />
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRenameOpen(false)}
+              >
+                {t("actions.cancel")}
+              </Button>
+              <Button type="submit" disabled={renaming || !renameName.trim()}>
+                {renaming && <Loader2Icon className="animate-spin" />}
+                {t("actions.save")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminare l&apos;album?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &laquo;{album.name}&raquo; verrà eliminato. Le foto non verranno
+              eliminate dall&apos;archivio.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteAlbum}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting && <Loader2Icon className="animate-spin" />}
+              {t("actions.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Share dialog */}
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
@@ -653,15 +836,19 @@ export default function AlbumDetailPage() {
             />
             <Button type="submit" disabled={sharing || !shareEmail.trim()}>
               {sharing ? <Loader2Icon className="animate-spin" /> : <Share2Icon />}
-              Condividi
+              {t("actions.share")}
             </Button>
           </form>
 
           <div className="mt-2">
             <p className="mb-2 text-xs font-medium text-muted-foreground">
-              Condiviso con
+              {t("sharing.sharedWith")}
             </p>
-            {shares.length === 0 ? (
+            {loadingShares ? (
+              <div className="flex justify-center py-3">
+                <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : shares.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Non ancora condiviso con nessuno.
               </p>
@@ -681,7 +868,7 @@ export default function AlbumDetailPage() {
                       size="icon"
                       className="size-7 shrink-0"
                       onClick={() => removeShare(s.userId)}
-                      aria-label={`Rimuovi ${s.email}`}
+                      aria-label={t("sharing.removeRecipient", { email: s.email })}
                     >
                       <XIcon className="size-4" />
                     </Button>

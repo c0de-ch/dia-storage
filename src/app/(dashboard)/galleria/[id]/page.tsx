@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -46,8 +46,9 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ImageViewer } from "@/components/image-viewer";
 import { HelpPopover } from "@/components/help-popover";
-import { MetadataForm } from "@/components/metadata-form";
+import { MetadataForm, type MetadataFormValues } from "@/components/metadata-form";
 import { ExifPanel } from "@/components/exif-panel";
+import { PageMasthead } from "@/components/page-masthead";
 import { t } from "@/lib/i18n";
 import type { Slide } from "@/types/slide";
 
@@ -59,8 +60,12 @@ export default function SlideDetailPage() {
   const [slide, setSlide] = useState<Slide | null>(null);
   const [siblings, setSiblings] = useState<Slide[]>([]);
   const [loading, setLoading] = useState(true);
+  // Permission flags from the API (default true until loaded).
+  const [canEdit, setCanEdit] = useState(true);
+  const [canDelete, setCanDelete] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [archivingSlide, setArchivingSlide] = useState(false);
+  const [writingExif, setWritingExif] = useState(false);
   const [describing, setDescribing] = useState(false);
   const [description, setDescription] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
@@ -79,13 +84,23 @@ export default function SlideDetailPage() {
       const data = await res.json();
       if (data.success) {
         setSlide(data.slide);
-        // Fetch siblings from same magazine
+        setCanEdit(data.canEdit !== false);
+        setCanDelete(data.canDelete !== false);
+        // Fetch siblings from same magazine (the API only sorts by
+        // title/dateTakenPrecise/createdAt, so order by slot client-side).
         if (data.slide.magazineId) {
           const sibRes = await fetch(
-            `/api/v1/slides?magazineId=${data.slide.magazineId}&limit=50&sortBy=slotNumber&sortOrder=asc`
+            `/api/v1/slides?magazineId=${data.slide.magazineId}&limit=50&sortBy=createdAt&sortOrder=asc`
           );
           const sibData = await sibRes.json();
-          if (sibData.success) setSiblings(sibData.slides);
+          if (sibData.success) {
+            const sorted = [...(sibData.slides as Slide[])].sort(
+              (a, b) =>
+                (a.slotNumber ?? Number.MAX_SAFE_INTEGER) -
+                  (b.slotNumber ?? Number.MAX_SAFE_INTEGER) || a.id - b.id
+            );
+            setSiblings(sorted);
+          }
         }
       }
     } catch (error) {
@@ -144,42 +159,71 @@ export default function SlideDetailPage() {
         method: "DELETE",
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
+        toast.success(t("success.deleted"));
         router.push("/galleria");
+      } else {
+        toast.error(t("errors.deleteFailed"));
       }
-    } catch (error) {
-      console.error("Errore nell'eliminazione:", error);
+    } catch {
+      toast.error(t("errors.deleteFailed"));
     } finally {
       setDeleting(false);
     }
   }
 
-  // Archive (move to backup)
+  // Archive (move to backup). The single-slide PATCH schema doesn't accept
+  // status "archived", so use the batch metadata endpoint like the gallery.
   async function handleArchive() {
     setArchivingSlide(true);
     try {
-      const res = await fetch(`/api/v1/slides/${slideId}`, {
-        method: "PATCH",
+      const res = await fetch(`/api/v1/slides/batch/metadata`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "archived" }),
+        body: JSON.stringify({
+          slideIds: [slideId],
+          metadata: { status: "archived" },
+        }),
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
+        toast.success("Diapositiva archiviata nel backup");
         router.push("/galleria");
+      } else {
+        toast.error("Errore nell'archiviazione");
       }
-    } catch (error) {
-      console.error("Errore nell'archiviazione:", error);
+    } catch {
+      toast.error("Errore nell'archiviazione");
     } finally {
       setArchivingSlide(false);
     }
   }
 
-  // EXIF write
+  // EXIF write: the route expects the tags to write in the JSON body.
   async function handleExifWrite() {
+    if (!slide) return;
+    const exifBody: Record<string, string> = {};
+    if (slide.title) exifBody.title = slide.title;
+    const dateForExif = slide.dateTakenPrecise || slide.dateTaken;
+    if (dateForExif) exifBody.dateTaken = dateForExif;
+    if (slide.location) exifBody.location = slide.location;
+    if (Object.keys(exifBody).length === 0) {
+      toast.error("Nessun dato EXIF da scrivere");
+      return;
+    }
+    setWritingExif(true);
     try {
-      await fetch(`/api/v1/slides/${slideId}/exif`, { method: "POST" });
-    } catch (error) {
-      console.error("Errore nella scrittura EXIF:", error);
+      const res = await fetch(`/api/v1/slides/${slideId}/exif`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(exifBody),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Dati EXIF scritti nel file");
+    } catch {
+      toast.error("Errore nella scrittura EXIF");
+    } finally {
+      setWritingExif(false);
     }
   }
 
@@ -268,12 +312,65 @@ export default function SlideDetailPage() {
     setSpeaking(false);
   }
 
+  // Stable identity: a fresh object literal on every render would make the
+  // metadata form think the slide changed and wipe unsaved edits.
+  const metadataInitialValues = useMemo<MetadataFormValues>(
+    () => ({
+      title: slide?.title ?? "",
+      dateTaken: slide?.dateTaken ?? "",
+      dateTakenPrecise: slide?.dateTakenPrecise ?? null,
+      location: slide?.location ?? "",
+      notes: slide?.notes ?? "",
+    }),
+    [slide]
+  );
+
+  // Keep the local slide state in sync after a successful save, so the
+  // masthead/breadcrumb update live and later resets use fresh values.
+  const handleMetadataSaved = useCallback((vals: MetadataFormValues) => {
+    setSlide((prev) =>
+      prev
+        ? {
+            ...prev,
+            title: vals.title || null,
+            dateTaken: vals.dateTaken || null,
+            dateTakenPrecise: vals.dateTakenPrecise || null,
+            location: vals.location || null,
+            notes: vals.notes || null,
+          }
+        : prev
+    );
+  }, []);
+
+  // Center the active thumbnail in the filmstrip (horizontal only — never
+  // scroll the page vertically) whenever it mounts or moves.
+  const scrollActiveThumb = useCallback((node: HTMLButtonElement | null) => {
+    if (!node) return;
+    const viewport = node.closest<HTMLElement>(
+      '[data-slot="scroll-area-viewport"]'
+    );
+    if (!viewport) return;
+    const delta =
+      node.getBoundingClientRect().left -
+      viewport.getBoundingClientRect().left;
+    viewport.scrollTo({
+      left:
+        viewport.scrollLeft + delta - viewport.clientWidth / 2 + node.clientWidth / 2,
+      behavior: "smooth",
+    });
+  }, []);
+
   if (loading) {
     return (
       <div className="flex flex-col gap-4 p-4 sm:p-6">
-        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-4 w-48" />
+        <div className="space-y-2">
+          <Skeleton className="h-3 w-56" />
+          <Skeleton className="h-9 w-72" />
+          <div className="film-sprockets mt-3 opacity-40" aria-hidden />
+        </div>
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-          <Skeleton className="aspect-[4/3] w-full rounded-lg" />
+          <Skeleton className="aspect-[3/2] w-full rounded-lg" />
           <div className="space-y-4">
             <Skeleton className="h-8 w-full" />
             <Skeleton className="h-8 w-full" />
@@ -300,6 +397,7 @@ export default function SlideDetailPage() {
 
   const displayTitle =
     slide.title || slide.originalFilename || `Diapositiva #${slide.id}`;
+  const frameNumber = `#${String(slide.id).padStart(4, "0")}`;
 
   const colorFilter =
     brightness !== 1 || contrast !== 1 || saturation !== 1
@@ -309,140 +407,142 @@ export default function SlideDetailPage() {
   return (
     <div className="flex flex-col gap-4 p-4 sm:p-6">
       {/* Breadcrumb */}
-      <div className="flex items-center justify-between">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink render={<Link href="/galleria" />}>
-                Galleria
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{displayTitle}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+      <Breadcrumb className="slide-reveal">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink render={<Link href="/galleria" />}>
+              {t("nav.gallery")}
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{displayTitle}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
-        {/* Prev/Next */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            disabled={!prevSlide}
-            onClick={() => prevSlide && navigateTo(prevSlide.id)}
-            title="Precedente"
-          >
-            <ChevronLeftIcon className="size-4" />
-          </Button>
-          {siblings.length > 0 && (
-            <span className="px-1 text-xs text-muted-foreground">
-              {currentSibIndex + 1} / {siblings.length}
+      {/* Editorial masthead */}
+      <PageMasthead
+        size="md"
+        eyebrow={`Diapositiva ${frameNumber}${
+          slide.magazineId ? ` · ${t("metadata.magazine")} ${slide.magazineId}` : ""
+        }`}
+        title={displayTitle}
+        subtitle={
+          slide.dateTaken || slide.location ? (
+            <span className="font-mono text-[11px] uppercase tracking-wide">
+              {[slide.dateTaken, slide.location].filter(Boolean).join(" · ")}
             </span>
-          )}
-          <Button
-            variant="outline"
-            size="icon-sm"
-            disabled={!nextSlide}
-            onClick={() => nextSlide && navigateTo(nextSlide.id)}
-            title="Successiva"
-          >
-            <ChevronRightIcon className="size-4" />
-          </Button>
-        </div>
-      </div>
+          ) : undefined
+        }
+        action={
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              disabled={!prevSlide}
+              onClick={() => prevSlide && navigateTo(prevSlide.id)}
+              title={t("actions.previous")}
+            >
+              <ChevronLeftIcon className="size-4" />
+            </Button>
+            {siblings.length > 0 && currentSibIndex >= 0 && (
+              <span className="px-1 font-mono text-sm tabular-nums text-primary">
+                {String(currentSibIndex + 1).padStart(2, "0")} /{" "}
+                {String(siblings.length).padStart(2, "0")}
+              </span>
+            )}
+            <Button
+              variant="outline"
+              size="icon-sm"
+              disabled={!nextSlide}
+              onClick={() => nextSlide && navigateTo(nextSlide.id)}
+              title="Successiva"
+            >
+              <ChevronRightIcon className="size-4" />
+            </Button>
+          </div>
+        }
+      >
+        {!canEdit && (
+          <span className="mt-2 inline-block w-fit rounded-[2px] border border-muted-foreground/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            Sola lettura
+          </span>
+        )}
+      </PageMasthead>
 
       {/* Main content: two columns */}
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* Left: Image viewer + describe */}
-        <div className="flex flex-col gap-3">
+        <div
+          className="slide-reveal flex flex-col gap-3"
+          style={{ animationDelay: "60ms" }}
+        >
           <ImageViewer
             src={`/api/v1/slides/${slide.id}/medium?v=${imgVersion}`}
             alt={displayTitle}
             downloadUrl={`/api/v1/slides/${slide.id}/original`}
-            className="aspect-[4/3] w-full"
+            className="aspect-[3/2] w-full"
             {...(adjustOpen && colorFilter ? { imageFilter: colorFilter } : {})}
           />
 
-          {/* Rotate / flip the original */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-xs text-muted-foreground">
-              Modifica immagine:
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => applyTransform("rotate-ccw")}
-              disabled={transformOp !== null}
-              title="Ruota a sinistra"
-            >
-              {transformOp === "rotate-ccw" ? (
-                <Loader2Icon className="size-3.5 animate-spin" />
-              ) : (
-                <RotateCcwIcon className="size-3.5" />
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => applyTransform("rotate-cw")}
-              disabled={transformOp !== null}
-              title="Ruota a destra"
-            >
-              {transformOp === "rotate-cw" ? (
-                <Loader2Icon className="size-3.5 animate-spin" />
-              ) : (
-                <RotateCwIcon className="size-3.5" />
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => applyTransform("flip-h")}
-              disabled={transformOp !== null}
-              title="Capovolgi orizzontale"
-            >
-              {transformOp === "flip-h" ? (
-                <Loader2Icon className="size-3.5 animate-spin" />
-              ) : (
-                <FlipHorizontalIcon className="size-3.5" />
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => applyTransform("flip-v")}
-              disabled={transformOp !== null}
-              title="Capovolgi verticale"
-            >
-              {transformOp === "flip-v" ? (
-                <Loader2Icon className="size-3.5 animate-spin" />
-              ) : (
-                <FlipVerticalIcon className="size-3.5" />
-              )}
-            </Button>
-            <Button
-              variant={adjustOpen ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => setAdjustOpen((o) => !o)}
-              title="Correggi colore"
-            >
-              <SlidersHorizontalIcon className="size-3.5" />
-              Correggi
-            </Button>
-            <HelpPopover
-              items={[
-                "Scorri sull'immagine per ingrandire, trascina per spostarti.",
-                "Ruota a sinistra/destra o capovolgi in orizzontale/verticale.",
-                "«Correggi» regola luminosità, contrasto e saturazione.",
-                "Modifica titolo, data, luogo e note nel pannello a destra.",
-              ]}
-            />
-          </div>
+          {/* Rotate / flip the original (hidden for read-only viewers) */}
+          {canEdit && (
+            <div className="space-y-1.5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-muted-foreground">
+                Modifica immagine
+              </p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <div className="inline-flex items-center gap-0.5 rounded-lg border bg-card p-0.5">
+                  {(
+                    [
+                      ["rotate-ccw", RotateCcwIcon, "Ruota a sinistra"],
+                      ["rotate-cw", RotateCwIcon, "Ruota a destra"],
+                      ["flip-h", FlipHorizontalIcon, "Capovolgi orizzontale"],
+                      ["flip-v", FlipVerticalIcon, "Capovolgi verticale"],
+                    ] as const
+                  ).map(([op, Icon, label]) => (
+                    <Button
+                      key={op}
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => applyTransform(op)}
+                      disabled={transformOp !== null}
+                      title={label}
+                      aria-label={label}
+                    >
+                      {transformOp === op ? (
+                        <Loader2Icon className="size-3.5 animate-spin" />
+                      ) : (
+                        <Icon className="size-3.5" />
+                      )}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  variant={adjustOpen ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setAdjustOpen((o) => !o)}
+                  title="Correggi colore"
+                >
+                  <SlidersHorizontalIcon className="size-3.5" />
+                  Correggi
+                </Button>
+                <HelpPopover
+                  items={[
+                    "Scorri sull'immagine per ingrandire, trascina per spostarti. Doppio clic per ingrandire o reimpostare.",
+                    "Ruota a sinistra/destra o capovolgi in orizzontale/verticale.",
+                    "«Correggi» regola luminosità, contrasto e saturazione.",
+                    "Modifica titolo, data, luogo e note nel pannello a destra.",
+                  ]}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Color correction (live CSS preview, baked on Apply) */}
-          {adjustOpen && (
-            <div className="flex flex-col gap-3 rounded-lg border p-3">
+          {canEdit && adjustOpen && (
+            <div className="flex flex-col gap-3 rounded-sm border bg-card p-3 shadow-sm">
               {(
                 [
                   ["Luminosità", brightness, setBrightness],
@@ -463,7 +563,7 @@ export default function SlideDetailPage() {
                     onChange={(e) => setter(parseFloat(e.target.value))}
                     className="flex-1 accent-primary"
                   />
-                  <span className="w-10 shrink-0 text-right text-xs tabular-nums">
+                  <span className="w-10 shrink-0 text-right font-mono text-xs tabular-nums">
                     {Math.round(value * 100)}%
                   </span>
                 </label>
@@ -527,26 +627,34 @@ export default function SlideDetailPage() {
               </>
             )}
           </div>
-          {description && (
-            <div className="rounded-lg border bg-muted/50 p-3 text-sm leading-relaxed">
-              {description}
-            </div>
-          )}
+          {/* Live region so screen readers announce the AI analysis result */}
+          <div role="status" aria-live="polite">
+            {description && (
+              <div className="rounded-lg border bg-muted/50 p-3 text-sm leading-relaxed">
+                {description}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right: Metadata form + actions */}
-        <div className="flex flex-col gap-4">
-          <MetadataForm
-            slideId={slide.id}
-            initialValues={{
-              title: slide.title ?? "",
-              dateTaken: slide.dateTaken ?? "",
-              dateTakenPrecise: slide.dateTakenPrecise ?? null,
-              location: slide.location ?? "",
-              notes: slide.notes ?? "",
-            }}
-            onExifWrite={handleExifWrite}
-          />
+        <div
+          className="slide-reveal flex flex-col gap-4"
+          style={{ animationDelay: "120ms" }}
+        >
+          <div className="space-y-3">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.35em] text-muted-foreground">
+              Schedatura
+            </h2>
+            <MetadataForm
+              slideId={slide.id}
+              initialValues={metadataInitialValues}
+              onSaved={handleMetadataSaved}
+              onExifWrite={handleExifWrite}
+              exifWriting={writingExif}
+              readOnly={!canEdit}
+            />
+          </div>
 
           {/* EXIF info */}
           <ExifPanel
@@ -561,8 +669,9 @@ export default function SlideDetailPage() {
           />
 
           {/* Archive to backup */}
-          {slide.status === "active" && (
-            <div className="border-t pt-4">
+          {canEdit && slide.status === "active" && (
+            <div className="space-y-3">
+              <div className="film-sprockets" aria-hidden />
               <Button
                 variant="outline"
                 size="sm"
@@ -581,71 +690,94 @@ export default function SlideDetailPage() {
           )}
 
           {/* Delete */}
-          <div className="border-t pt-4">
-            <AlertDialog>
-              <AlertDialogTrigger
-                render={
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="w-full"
-                    disabled={deleting}
-                  >
-                    {deleting ? (
-                      <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
-                    ) : (
-                      <Trash2Icon className="mr-1.5 size-3.5" />
-                    )}
-                    {t("gallery.deleteSlide")}
-                  </Button>
-                }
-              />
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{t("confirm.deleteTitle")}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {t("gallery.deleteSlideConfirmLong")}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    {t("actions.delete")}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+          {canDelete && (
+            <div className="space-y-3">
+              <div className="film-sprockets" aria-hidden />
+              <AlertDialog>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full"
+                      disabled={deleting}
+                    >
+                      {deleting ? (
+                        <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
+                      ) : (
+                        <Trash2Icon className="mr-1.5 size-3.5" />
+                      )}
+                      {t("gallery.deleteSlide")}
+                    </Button>
+                  }
+                />
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t("confirm.deleteTitle")}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t("gallery.deleteSlideConfirmLong")}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {t("actions.delete")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Bottom: Sibling thumbnail strip */}
+      {/* Bottom: Sibling filmstrip */}
       {siblings.length > 1 && (
-        <div className="space-y-2 border-t pt-4">
-          <h3 className="text-sm font-medium text-muted-foreground">
+        <div
+          className="slide-reveal space-y-2 pt-2"
+          style={{ animationDelay: "180ms" }}
+        >
+          <h3 className="font-mono text-[11px] uppercase tracking-[0.35em] text-muted-foreground">
             Stesso caricatore
           </h3>
+          <div className="film-sprockets" aria-hidden />
           <ScrollArea className="w-full">
             <div className="flex gap-2 pb-2">
-              {siblings.map((sib) => (
-                <button
-                  key={sib.id}
-                  onClick={() => navigateTo(sib.id)}
-                  className={`relative shrink-0 overflow-hidden rounded-md border-2 transition-all ${
-                    sib.id === slide.id
-                      ? "border-primary ring-2 ring-primary/30"
-                      : "border-transparent hover:border-muted-foreground/30"
-                  }`}
-                >
-                  <SiblingThumb id={sib.id} alt={sib.title || sib.originalFilename || `#${sib.id}`} />
-                </button>
-              ))}
+              {siblings.map((sib) => {
+                const isActive = sib.id === slide.id;
+                const sibAlt =
+                  sib.title || sib.originalFilename || `#${sib.id}`;
+                return (
+                  <button
+                    key={sib.id}
+                    ref={isActive ? scrollActiveThumb : undefined}
+                    onClick={() => navigateTo(sib.id)}
+                    title={sibAlt}
+                    aria-label={sibAlt}
+                    aria-current={isActive ? "true" : undefined}
+                    className={`relative shrink-0 overflow-hidden rounded-[2px] border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      isActive
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-transparent hover:border-muted-foreground/30"
+                    }`}
+                  >
+                    <SiblingThumb id={sib.id} alt={sibAlt} />
+                    <span
+                      className="pointer-events-none absolute bottom-0.5 right-1 font-mono text-[9px] text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]"
+                      aria-hidden
+                    >
+                      #{String(sib.id).padStart(4, "0")}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
+          <div className="film-sprockets" aria-hidden />
         </div>
       )}
     </div>

@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from "react";
 import {
   BookOpenIcon,
   CircleHelp,
@@ -33,6 +32,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { PageMasthead } from "@/components/page-masthead";
 import { useSpeechSynthesis } from "@/hooks/use-speech-synthesis";
 
 // ---------------------------------------------------------------------------
@@ -52,61 +52,38 @@ Sesto: inserisci la scheda SD dello scanner nel Mac. L'app rileverà automaticam
 
 export default function AiutoPage() {
   const [remoteConnected, setRemoteConnected] = useState(false);
-  const [requesting, setRequesting] = useState(false);
   const { speak, cancel, isSpeaking, isSupported: ttsSupported } = useSpeechSynthesis();
 
-  const checkStatus = useCallback(async () => {
-    try {
-      const res = await fetch("/api/v1/health");
-      if (res.ok) {
-        const data = await res.json();
-        setRemoteConnected(data.remoteAssistance === true);
-      }
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
   useEffect(() => {
-    checkStatus();
-  }, [checkStatus]);
-
-  async function requestAssistance() {
-    setRequesting(true);
-    try {
-      const res = await fetch("/api/v1/remote-assistance", {
-        method: "POST",
-      });
-      if (res.ok) {
-        toast.success(
-          "Richiesta inviata. Un tecnico si collegherà a breve."
-        );
-        setRemoteConnected(true);
-      } else {
-        toast.error(
-          "Impossibile inviare la richiesta. Riprova più tardi."
-        );
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/v1/health");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) {
+          setRemoteConnected(data.remoteAssistance === true);
+        }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      toast.error("Errore di rete. Verifica la connessione.");
-    } finally {
-      setRequesting(false);
-    }
-  }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Aiuto e assistenza
-        </h1>
-        <p className="text-muted-foreground">
-          Trova risposte alle domande frequenti o richiedi assistenza remota.
-        </p>
-      </div>
+      <PageMasthead
+        size="md"
+        eyebrow="Dia-Storage · Supporto"
+        title="Aiuto e assistenza"
+        subtitle="Trova risposte alle domande frequenti, guide all'utilizzo e contatti per il supporto."
+      />
 
-      {/* Remote assistance card */}
-      <Card className="border-2">
+      {/* Remote assistance card (funzione non ancora attiva lato server) */}
+      <Card className="slide-reveal" style={{ animationDelay: "70ms" }}>
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 flex size-16 items-center justify-center rounded-full bg-primary/10">
             <Headset className="size-8 text-primary" />
@@ -122,8 +99,8 @@ export default function AiutoPage() {
           <div className="flex items-center gap-2">
             {remoteConnected ? (
               <>
-                <Wifi className="size-4 text-green-600" />
-                <Badge className="bg-green-600 text-white hover:bg-green-700">
+                <Wifi className="size-4 text-success" />
+                <Badge className="bg-success text-success-foreground">
                   Connesso
                 </Badge>
               </>
@@ -135,22 +112,18 @@ export default function AiutoPage() {
             )}
           </div>
 
-          <Button
-            size="lg"
-            className="h-12 px-8 text-base"
-            onClick={requestAssistance}
-            disabled={requesting}
-          >
+          <Button size="lg" className="h-12 px-8 text-base" disabled>
             <Headset className="size-5 mr-2" />
-            {requesting
-              ? "Invio richiesta..."
-              : "Richiedi assistenza remota"}
+            Richiedi assistenza remota
           </Button>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            Funzione in preparazione
+          </p>
         </CardContent>
       </Card>
 
       {/* Dia-Uploader macOS app */}
-      <Card>
+      <Card className="slide-reveal" style={{ animationDelay: "140ms" }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <LaptopIcon className="size-5" />
@@ -236,7 +209,7 @@ export default function AiutoPage() {
       </Card>
 
       {/* FAQ Accordion */}
-      <Card>
+      <Card className="slide-reveal" style={{ animationDelay: "210ms" }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CircleHelp className="size-5" />
@@ -250,6 +223,9 @@ export default function AiutoPage() {
           <Accordion>
             <AccordionItem value="caricare-diapositive">
               <AccordionTrigger>
+                <span className="mr-2 font-mono text-[10px] tracking-wider text-muted-foreground/70">
+                  #01
+                </span>
                 Come caricare le diapositive dallo scanner
               </AccordionTrigger>
               <AccordionContent>
@@ -290,6 +266,9 @@ export default function AiutoPage() {
 
             <AccordionItem value="aggiungere-informazioni">
               <AccordionTrigger>
+                <span className="mr-2 font-mono text-[10px] tracking-wider text-muted-foreground/70">
+                  #02
+                </span>
                 Come aggiungere informazioni alle diapositive
               </AccordionTrigger>
               <AccordionContent>
@@ -331,6 +310,9 @@ export default function AiutoPage() {
 
             <AccordionItem value="cercare-diapositive">
               <AccordionTrigger>
+                <span className="mr-2 font-mono text-[10px] tracking-wider text-muted-foreground/70">
+                  #03
+                </span>
                 Come cercare le diapositive
               </AccordionTrigger>
               <AccordionContent>
@@ -367,6 +349,9 @@ export default function AiutoPage() {
 
             <AccordionItem value="scaricare-originali">
               <AccordionTrigger>
+                <span className="mr-2 font-mono text-[10px] tracking-wider text-muted-foreground/70">
+                  #04
+                </span>
                 Come scaricare le diapositive originali
               </AccordionTrigger>
               <AccordionContent>
@@ -383,7 +368,7 @@ export default function AiutoPage() {
                     </li>
                     <li>
                       Il file verr&agrave; scaricato nel formato originale
-                      (solitamente TIFF o JPEG).
+                      (JPEG ad alta risoluzione).
                     </li>
                   </ol>
                   <p>
@@ -397,7 +382,12 @@ export default function AiutoPage() {
             </AccordionItem>
 
             <AccordionItem value="backup">
-              <AccordionTrigger>Come funziona il backup</AccordionTrigger>
+              <AccordionTrigger>
+                <span className="mr-2 font-mono text-[10px] tracking-wider text-muted-foreground/70">
+                  #05
+                </span>
+                Come funziona il backup
+              </AccordionTrigger>
               <AccordionContent>
                 <div className="space-y-2 text-muted-foreground">
                   <p>
@@ -435,7 +425,12 @@ export default function AiutoPage() {
             </AccordionItem>
 
             <AccordionItem value="assistenza">
-              <AccordionTrigger>Come richiedere assistenza</AccordionTrigger>
+              <AccordionTrigger>
+                <span className="mr-2 font-mono text-[10px] tracking-wider text-muted-foreground/70">
+                  #06
+                </span>
+                Come richiedere assistenza
+              </AccordionTrigger>
               <AccordionContent>
                 <div className="space-y-2 text-muted-foreground">
                   <p>
@@ -444,21 +439,16 @@ export default function AiutoPage() {
                   </p>
                   <ol className="list-decimal pl-5 space-y-1">
                     <li>
-                      <strong>Assistenza remota:</strong> clicca il pulsante
-                      &quot;Richiedi assistenza remota&quot; in cima a questa
-                      pagina. Un tecnico si collegherà direttamente al tuo
-                      computer per risolvere il problema.
-                    </li>
-                    <li>
                       <strong>Contatto diretto:</strong> usa i recapiti nella
                       sezione contatti qui sotto per chiamare o inviare
                       un&apos;email al supporto tecnico.
                     </li>
+                    <li>
+                      <strong>Assistenza remota:</strong> la funzione è in
+                      preparazione e sarà disponibile prossimamente in cima a
+                      questa pagina.
+                    </li>
                   </ol>
-                  <p>
-                    Per l&apos;assistenza remota, assicurati che il computer sia
-                    connesso a Internet e che l&apos;applicazione sia aperta.
-                  </p>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -467,7 +457,7 @@ export default function AiutoPage() {
       </Card>
 
       {/* Scanner Manual Reference */}
-      <Card>
+      <Card className="slide-reveal" style={{ animationDelay: "280ms" }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BookOpenIcon className="size-5" />
@@ -483,18 +473,19 @@ export default function AiutoPage() {
             <h3 className="mb-3 text-lg font-semibold">
               Panoramica dello scanner
             </h3>
-            <div className="overflow-hidden rounded-lg border">
+            <figure className="max-w-lg rounded-sm border bg-card p-2 shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element -- static help illustration, low-traffic page */}
               <img
                 src="/images/manual/scanner-overview.jpg"
                 alt="Reflecta DigitDia Evolution - panoramica"
-                className="w-full max-w-lg"
+                loading="lazy"
+                className="w-full rounded-[2px]"
               />
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Lo scanner Reflecta DigitDia Evolution con display LCD da 7 pollici,
-              caricatore inserito e scheda SD per il salvataggio delle scansioni.
-            </p>
+              <figcaption className="px-0.5 pt-1.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                Reflecta DigitDia Evolution · display LCD 7&quot;, caricatore
+                inserito e scheda SD per il salvataggio delle scansioni
+              </figcaption>
+            </figure>
           </div>
 
           <Separator />
@@ -504,14 +495,18 @@ export default function AiutoPage() {
             <h3 className="mb-3 text-lg font-semibold">
               Componenti del dispositivo
             </h3>
-            <div className="overflow-hidden rounded-lg border">
+            <figure className="max-w-2xl rounded-sm border bg-card p-2 shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element -- static help illustration, low-traffic page */}
               <img
                 src="/images/manual/product-parts.jpg"
                 alt="Reflecta DigitDia Evolution - componenti numerati"
-                className="w-full max-w-2xl"
+                loading="lazy"
+                className="w-full rounded-[2px]"
               />
-            </div>
+              <figcaption className="px-0.5 pt-1.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                Componenti numerati del dispositivo
+              </figcaption>
+            </figure>
             <div className="mt-3 grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
               <div><strong>1.</strong> Display LCD</div>
               <div><strong>2.</strong> LED di controllo</div>
@@ -536,14 +531,18 @@ export default function AiutoPage() {
             <h3 className="mb-3 text-lg font-semibold">
               Utilizzo dei caricatori (magazine)
             </h3>
-            <div className="overflow-hidden rounded-lg border">
+            <figure className="max-w-2xl rounded-sm border bg-card p-2 shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element -- static help illustration, low-traffic page */}
               <img
                 src="/images/manual/magazine-usage.jpg"
                 alt="Reflecta DigitDia Evolution - utilizzo caricatori"
-                className="w-full max-w-2xl"
+                loading="lazy"
+                className="w-full rounded-[2px]"
               />
-            </div>
+              <figcaption className="px-0.5 pt-1.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                Inserimento e trasporto dei caricatori
+              </figcaption>
+            </figure>
             <div className="mt-3 space-y-2 text-sm text-muted-foreground">
               <p>
                 <strong>Tipi di caricatori compatibili:</strong> Universal (DIN 108),
@@ -577,37 +576,37 @@ export default function AiutoPage() {
               Specifiche tecniche
             </h3>
             <div className="grid gap-2 text-sm sm:grid-cols-2">
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="font-medium">Sensore</p>
-                <p className="text-muted-foreground">CMOS 1/2,33&quot; - 15,3 MP</p>
+              <div className="rounded-sm border bg-card p-3">
+                <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Sensore</p>
+                <p className="text-sm font-medium text-foreground">CMOS 1/2,33&quot; - 15,3 MP</p>
               </div>
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="font-medium">Risoluzione</p>
-                <p className="text-muted-foreground">4608 x 3072 px (14MP) o 5760 x 3840 px (22MP interp.)</p>
+              <div className="rounded-sm border bg-card p-3">
+                <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Risoluzione</p>
+                <p className="text-sm font-medium text-foreground">4608 x 3072 px (14MP) o 5760 x 3840 px (22MP interp.)</p>
               </div>
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="font-medium">Velocita scansione</p>
-                <p className="text-muted-foreground">&lt; 5 sec per diapositiva (automatico)</p>
+              <div className="rounded-sm border bg-card p-3">
+                <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Velocità scansione</p>
+                <p className="text-sm font-medium text-foreground">&lt; 5 sec per diapositiva (automatico)</p>
               </div>
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="font-medium">Formato output</p>
-                <p className="text-muted-foreground">JPEG (compressione bassa)</p>
+              <div className="rounded-sm border bg-card p-3">
+                <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Formato output</p>
+                <p className="text-sm font-medium text-foreground">JPEG (compressione bassa)</p>
               </div>
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="font-medium">Caricatori</p>
-                <p className="text-muted-foreground">Universal (DIN 108), CS, LKM</p>
+              <div className="rounded-sm border bg-card p-3">
+                <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Caricatori</p>
+                <p className="text-sm font-medium text-foreground">Universal (DIN 108), CS, LKM</p>
               </div>
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="font-medium">Memoria</p>
-                <p className="text-muted-foreground">Scheda SD/SDHC fino a 128 GB</p>
+              <div className="rounded-sm border bg-card p-3">
+                <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Memoria</p>
+                <p className="text-sm font-medium text-foreground">Scheda SD/SDHC fino a 128 GB</p>
               </div>
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="font-medium">Display</p>
-                <p className="text-muted-foreground">LCD IPS 7 pollici (17,8 cm)</p>
+              <div className="rounded-sm border bg-card p-3">
+                <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Display</p>
+                <p className="text-sm font-medium text-foreground">LCD IPS 7 pollici (17,8 cm)</p>
               </div>
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="font-medium">Dimensioni</p>
-                <p className="text-muted-foreground">245 x 243 x 141 mm, 1650 g</p>
+              <div className="rounded-sm border bg-card p-3">
+                <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Dimensioni</p>
+                <p className="text-sm font-medium text-foreground">245 x 243 x 141 mm, 1650 g</p>
               </div>
             </div>
           </div>
@@ -615,7 +614,7 @@ export default function AiutoPage() {
       </Card>
 
       {/* Contact info */}
-      <Card>
+      <Card className="slide-reveal" style={{ animationDelay: "350ms" }}>
         <CardHeader>
           <CardTitle>Contatti</CardTitle>
           <CardDescription>

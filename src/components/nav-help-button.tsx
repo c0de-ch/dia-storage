@@ -86,7 +86,7 @@ export function NavHelpButton({ text }: NavHelpButtonProps) {
               e.stopPropagation();
               speak();
             }}
-            className="absolute right-1 top-1/2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/menu-item:opacity-100"
+            className="absolute right-1 top-1/2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/menu-item:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
             aria-label="Aiuto vocale"
           />
         }

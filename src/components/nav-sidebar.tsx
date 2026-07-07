@@ -17,6 +17,7 @@ import {
   ChevronUpIcon,
   FileTextIcon,
   PaletteIcon,
+  type LucideIcon,
 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth/context";
@@ -52,7 +53,15 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-const mainNavItems = [
+export interface NavItem {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  hasBadge?: boolean;
+  helpKey: Parameters<typeof t>[0];
+}
+
+export const mainNavItems: NavItem[] = [
   {
     label: "Panoramica",
     href: "/",
@@ -79,6 +88,12 @@ const mainNavItems = [
     helpKey: "navHelp.galleria" as const,
   },
   {
+    label: "Condivisi con me",
+    href: "/condivisi",
+    icon: UsersIcon,
+    helpKey: "navHelp.condivisi" as const,
+  },
+  {
     label: t("nav.search"),
     href: "/ricerca",
     icon: SearchIcon,
@@ -86,7 +101,7 @@ const mainNavItems = [
   },
 ];
 
-const adminNavItems = [
+export const adminNavItems: NavItem[] = [
   {
     label: t("nav.users"),
     href: "/admin/utenti",
@@ -119,6 +134,20 @@ const adminNavItems = [
   },
 ];
 
+/**
+ * Slim "film edge" indicator + stronger typography for the active route.
+ * Uses only sidebar tokens so it holds up in all four themes (the vivid
+ * theme's sidebar-accent barely separates from the sidebar background).
+ */
+const menuButtonClassName =
+  "relative data-active:font-semibold data-active:text-sidebar-primary data-active:before:absolute data-active:before:inset-y-1.5 data-active:before:left-0 data-active:before:w-0.5 data-active:before:rounded-full data-active:before:bg-sidebar-primary";
+
+/** Prefix-aware active check so dynamic routes (e.g. /galleria/12) light up. */
+function isRouteActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function NavSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
@@ -132,7 +161,7 @@ export function NavSidebar() {
         });
         if (res.ok) {
           const data = await res.json();
-          setQueueCount(data.count ?? 0);
+          setQueueCount(data.total ?? 0);
         }
       } catch (error) {
         // Polled every 30s; avoid toast spam but surface in the console so
@@ -153,12 +182,19 @@ export function NavSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href="/" />}>
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <ImageIcon className="size-4" />
+              {/* Miniature 35mm slide mount, echoing the SlideCard idiom */}
+              <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-sm border bg-card p-[3px] shadow-sm">
+                <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[2px] bg-primary text-primary-foreground">
+                  <ImageIcon className="size-3.5" />
+                  <div
+                    className="pointer-events-none absolute inset-0 rounded-[2px] shadow-[inset_0_0_5px_rgba(0,0,0,0.4)]"
+                    aria-hidden
+                  />
+                </div>
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{t("app.name")}</span>
-                <span className="truncate text-xs text-muted-foreground">
+                <span className="truncate font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
                   {t("app.tagline")}
                 </span>
               </div>
@@ -175,15 +211,21 @@ export function NavSidebar() {
               {mainNavItems.map((item) => (
                 <SidebarMenuItem key={item.href} className="group/menu-item">
                   <SidebarMenuButton
-                    isActive={pathname === item.href}
+                    isActive={isRouteActive(pathname, item.href)}
                     tooltip={item.label}
+                    className={menuButtonClassName}
                     render={<Link href={item.href} />}
                   >
                     <item.icon />
                     <span>{item.label}</span>
                   </SidebarMenuButton>
                   {item.hasBadge && queueCount > 0 && (
-                    <SidebarMenuBadge>{queueCount}</SidebarMenuBadge>
+                    // Primary chip: the only live number in the sidebar. It
+                    // fades out on hover/focus so the NavHelpButton (same
+                    // right-1 slot) never overlaps it.
+                    <SidebarMenuBadge className="rounded-full bg-primary px-1.5 font-mono text-primary-foreground transition-opacity peer-hover/menu-button:text-primary-foreground peer-data-active/menu-button:text-primary-foreground group-focus-within/menu-item:opacity-0 group-hover/menu-item:opacity-0">
+                      {queueCount}
+                    </SidebarMenuBadge>
                   )}
                   <NavHelpButton text={t(item.helpKey)} />
                 </SidebarMenuItem>
@@ -202,8 +244,9 @@ export function NavSidebar() {
                   {adminNavItems.map((item) => (
                     <SidebarMenuItem key={item.href} className="group/menu-item">
                       <SidebarMenuButton
-                        isActive={pathname === item.href}
+                        isActive={isRouteActive(pathname, item.href)}
                         tooltip={item.label}
+                        className={menuButtonClassName}
                         render={<Link href={item.href} />}
                       >
                         <item.icon />
@@ -223,7 +266,9 @@ export function NavSidebar() {
         <SidebarMenu>
           <SidebarMenuItem className="group/menu-item">
             <SidebarMenuButton
+              isActive={isRouteActive(pathname, "/aiuto")}
               tooltip="Aiuto"
+              className={menuButtonClassName}
               render={<Link href="/aiuto" />}
             >
               <HelpCircleIcon />

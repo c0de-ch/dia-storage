@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
 import { canEditCollection } from '@/lib/auth/permissions';
+import { sendShareNotificationEmail } from '@/lib/email/transport';
 import { parseIdParam } from '@/lib/api/params';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
@@ -19,7 +20,7 @@ async function loadManageable(
   request: NextRequest,
   idRaw: string
 ): Promise<
-  | { ok: true; collectionId: number }
+  | { ok: true; collectionId: number; collectionName: string }
   | { ok: false; response: NextResponse }
 > {
   const parsed = parseIdParam(idRaw);
@@ -51,7 +52,7 @@ async function loadManageable(
       ),
     };
   }
-  return { ok: true, collectionId: collection.id };
+  return { ok: true, collectionId: collection.id, collectionName: collection.name };
 }
 
 // List who an album is shared with.
@@ -123,6 +124,18 @@ export const POST = withAuth(async (request: NextRequest, context) => {
       sharedByUserId: requester.id,
     })
     .onConflictDoNothing();
+
+  // Best-effort email notification.
+  try {
+    await sendShareNotificationEmail({
+      to: target.email,
+      sharerName: requester.name || requester.email,
+      kind: 'album',
+      itemName: access.collectionName,
+    });
+  } catch (err) {
+    console.error('Errore invio notifica condivisione album:', err instanceof Error ? err.message : err);
+  }
 
   return NextResponse.json(
     {

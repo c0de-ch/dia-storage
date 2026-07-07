@@ -1,47 +1,71 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { SearchIcon, XIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  CommandDialog,
-  Command,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-} from "@/components/ui/command";
-import { t } from "@/lib/i18n";
 
 interface SearchBarProps {
   value?: string;
   onChange?: (value: string) => void;
+  /**
+   * Called with the live input value when the user presses Enter, after
+   * flushing the pending debounce (so `onChange` and `onSubmit` never
+   * disagree). When set, Enter is consumed here and does not also submit
+   * a surrounding form.
+   */
+  onSubmit?: (value: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
   className?: string;
+  /**
+   * Forwarded to the underlying input, so a surrounding <form> can read
+   * the live (not-yet-debounced) value via FormData on submit.
+   */
+  name?: string;
 }
 
 export function SearchBar({
   value: controlledValue,
   onChange,
+  onSubmit,
   placeholder = "Cerca diapositive...",
   autoFocus = false,
   className,
+  name,
 }: SearchBarProps) {
   const [internalValue, setInternalValue] = useState(controlledValue ?? "");
+  const [prevControlledValue, setPrevControlledValue] =
+    useState(controlledValue);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const value = controlledValue ?? internalValue;
+  // Keep the displayed value in sync when the parent changes it from the
+  // outside (suggestion chips, programmatic clear, ...). While the user is
+  // typing, `internalValue` leads and the debounced onChange catches up.
+  // ("Adjust state when props change" render pattern, per React docs.)
+  if (controlledValue !== prevControlledValue) {
+    setPrevControlledValue(controlledValue);
+    if (controlledValue !== undefined) setInternalValue(controlledValue);
+  }
+
+  // An external value update supersedes any pending debounce from earlier
+  // typing, which would otherwise fire later with a stale value and desync
+  // the input from the results. When the change is the echo of our own
+  // debounced onChange the ref is already null, so this is a no-op.
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+  }, [controlledValue]);
 
   const handleChange = useCallback(
     (newValue: string) => {
       setInternalValue(newValue);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
+        debounceRef.current = null;
         onChange?.(newValue);
       }, 300);
     },
@@ -54,7 +78,29 @@ export function SearchBar({
     };
   }, []);
 
+  /** Fire the pending debounced onChange immediately, if any. */
+  function flushPending() {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+      onChange?.(internalValue);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+    flushPending();
+    if (onSubmit) {
+      e.preventDefault();
+      onSubmit(internalValue);
+    }
+  }
+
   function handleClear() {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
     setInternalValue("");
     onChange?.("");
     inputRef.current?.focus();
@@ -66,16 +112,19 @@ export function SearchBar({
       <Input
         ref={inputRef}
         type="search"
-        value={value}
+        name={name}
+        value={internalValue}
         onChange={(e) => handleChange(e.target.value)}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         autoFocus={autoFocus}
         className="pl-8 pr-8"
       />
-      {value && (
+      {internalValue && (
         <Button
           variant="ghost"
           size="icon-xs"
+          aria-label="Cancella ricerca"
           className="absolute right-1.5 top-1/2 -translate-y-1/2"
           onClick={handleClear}
         >
@@ -83,72 +132,5 @@ export function SearchBar({
         </Button>
       )}
     </div>
-  );
-}
-
-export function SearchBarWithCommand() {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const router = useRouter();
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setOpen((prev) => !prev);
-      }
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  function handleSearch() {
-    if (query.trim()) {
-      router.push(`/ricerca?q=${encodeURIComponent(query.trim())}`);
-      setOpen(false);
-      setQuery("");
-    }
-  }
-
-  return (
-    <>
-      <Button
-        variant="outline"
-        className="w-64 justify-start text-muted-foreground"
-        onClick={() => setOpen(true)}
-      >
-        <SearchIcon className="mr-2 size-4" />
-        <span>Cerca...</span>
-        <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-          <span className="text-xs">&#8984;</span>K
-        </kbd>
-      </Button>
-      <CommandDialog open={open} onOpenChange={setOpen} title="Cerca" description="Cerca diapositive per titolo, luogo o data">
-        <Command>
-          <CommandInput
-            placeholder="Cerca diapositive..."
-            value={query}
-            onValueChange={setQuery}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSearch();
-            }}
-          />
-          <CommandList>
-            <CommandEmpty>Digita per cercare...</CommandEmpty>
-            <CommandGroup heading="Azioni rapide">
-              <CommandItem
-                onSelect={() => {
-                  router.push("/ricerca");
-                  setOpen(false);
-                }}
-              >
-                <SearchIcon className="mr-2 size-4" />
-                {t("search.advancedSearch")}
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </CommandDialog>
-    </>
   );
 }

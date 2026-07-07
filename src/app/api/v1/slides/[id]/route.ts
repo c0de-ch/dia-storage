@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
-import { canEditSlide, canDeleteSlide, canViewSlide } from '@/lib/auth/permissions';
-import { slideSharedWithUser } from '@/lib/auth/sharing';
+import { canEditSlide, canDeleteSlide } from '@/lib/auth/permissions';
+import { canAccessSlideRecord } from '@/lib/auth/sharing';
 import { canAssignMagazine } from '@/lib/api/magazine-guard';
 import { parseIdParam } from '@/lib/api/params';
 import { parseJsonBody, slidePatchSchema } from '@/lib/api/validation';
@@ -30,10 +30,7 @@ export const GET = withAuth(async (request: NextRequest, context) => {
     }
 
     const user = (request as AuthenticatedRequest).user;
-    if (
-      !canViewSlide(user, slide.uploadedBy ?? undefined) &&
-      !(await slideSharedWithUser(slide.id, user.id))
-    ) {
+    if (!(await canAccessSlideRecord(user, slide))) {
       return NextResponse.json(
         { success: false, message: 'Diapositiva non trovata.' },
         { status: 404 }
@@ -43,6 +40,8 @@ export const GET = withAuth(async (request: NextRequest, context) => {
     return NextResponse.json({
       success: true,
       slide,
+      canEdit: canEditSlide(user, slide.uploadedBy ?? undefined),
+      canDelete: canDeleteSlide(user, slide.uploadedBy ?? undefined),
     });
   } catch (error) {
     console.error('Errore nel recupero della diapositiva:', error);
