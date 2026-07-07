@@ -12,6 +12,11 @@ vi.mock("@/lib/db/schema", () => ({
     slideId: "slideCollections.slideId",
   },
   collections: { id: "collections.id" },
+  galleryShares: {
+    id: "galleryShares.id",
+    ownerUserId: "galleryShares.ownerUserId",
+    sharedWithUserId: "galleryShares.sharedWithUserId",
+  },
 }));
 
 import { db } from "@/lib/db";
@@ -20,6 +25,9 @@ import {
   slideSharedWithUser,
   collectionAccess,
   collectionsSharedWith,
+  gallerySharedWithUser,
+  canViewOwnerGallery,
+  canAccessSlideRecord,
 } from "@/lib/auth/sharing";
 import type { users, collections } from "@/lib/db/schema";
 
@@ -129,5 +137,120 @@ describe("collectionsSharedWith", () => {
     });
     const rows = await collectionsSharedWith(1);
     expect(rows).toEqual([{ id: 3, name: "Shared" }]);
+  });
+});
+
+describe("gallerySharedWithUser", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("is false when ownerId is null, without querying", async () => {
+    expect(await gallerySharedWithUser(null, 1)).toBe(false);
+    expect(await gallerySharedWithUser(undefined, 1)).toBe(false);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it("is true when the owner views their own gallery, without querying", async () => {
+    expect(await gallerySharedWithUser(7, 7)).toBe(true);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it("is true when a gallery-share row exists", async () => {
+    mockSelectWhereLimit([{ id: 1 }]);
+    expect(await gallerySharedWithUser(7, 2)).toBe(true);
+  });
+
+  it("is false when no gallery-share row exists", async () => {
+    mockSelectWhereLimit([]);
+    expect(await gallerySharedWithUser(7, 2)).toBe(false);
+  });
+});
+
+describe("canViewOwnerGallery", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("is true for admins/editors without querying", async () => {
+    expect(await canViewOwnerGallery(asUser({ id: 2, role: "admin" }), 7)).toBe(true);
+    expect(await canViewOwnerGallery(asUser({ id: 3, role: "editor" }), 7)).toBe(true);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it("is true when viewing your own gallery without querying", async () => {
+    expect(await canViewOwnerGallery(asUser({ id: 7 }), 7)).toBe(true);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it("consults the share table for a regular non-owner user", async () => {
+    mockSelectWhereLimit([{ id: 1 }]);
+    expect(await canViewOwnerGallery(asUser({ id: 2 }), 7)).toBe(true);
+
+    vi.clearAllMocks();
+    mockSelectWhereLimit([]);
+    expect(await canViewOwnerGallery(asUser({ id: 2 }), 7)).toBe(false);
+  });
+});
+
+describe("canAccessSlideRecord", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("is true for the uploader without querying", async () => {
+    expect(
+      await canAccessSlideRecord(asUser({ id: 1 }), { id: 10, uploadedBy: 1 })
+    ).toBe(true);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it("is true for admins without querying", async () => {
+    expect(
+      await canAccessSlideRecord(asUser({ id: 2, role: "admin" }), { id: 10, uploadedBy: 9 })
+    ).toBe(true);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it("is true when the slide owner shared their whole gallery", async () => {
+    mockSelectWhereLimit([{ id: 1 }]); // gallerySharedWithUser → row
+    expect(
+      await canAccessSlideRecord(asUser({ id: 2 }), { id: 10, uploadedBy: 9 })
+    ).toBe(true);
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to album sharing when the gallery is not shared", async () => {
+    let call = 0;
+    vi.mocked(db.select).mockImplementation(() => {
+      call++;
+      if (call === 1) {
+        // gallerySharedWithUser → no row
+        return {
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }),
+          }),
+        } as never;
+      }
+      // slideSharedWithUser → row
+      return {
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([{ collectionId: 3 }]) }),
+          }),
+        }),
+      } as never;
+    });
+    expect(
+      await canAccessSlideRecord(asUser({ id: 2 }), { id: 10, uploadedBy: 9 })
+    ).toBe(true);
+    expect(call).toBe(2);
+  });
+
+  it("is false when neither the gallery nor an album is shared", async () => {
+    vi.mocked(db.select).mockImplementation(() => {
+      const limit = vi.fn().mockResolvedValue([]);
+      const where = vi.fn().mockReturnValue({ limit });
+      return {
+        from: vi.fn().mockReturnValue({ where, innerJoin: vi.fn().mockReturnValue({ where }) }),
+      } as never;
+    });
+    expect(
+      await canAccessSlideRecord(asUser({ id: 2 }), { id: 10, uploadedBy: 9 })
+    ).toBe(false);
   });
 });
