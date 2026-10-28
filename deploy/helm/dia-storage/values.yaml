@@ -32,6 +32,9 @@ config:
     maxOtpAttempts: 5
     otpCooldownSeconds: 60
     defaultChannel: email
+    # Sign-in link next to the code in the OTP mail. Off where receivers drop
+    # a link that carries the address and the code (Microsoft 365).
+    emailMagicLink: true
     # allowedDomains: [example.com]
   email:
     # host, port, secure, user, password and from come from the secret

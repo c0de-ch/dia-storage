@@ -36,6 +36,10 @@ auth:
   #   - "example.com"
   # Canale predefinito: email, whatsapp, both
   defaultChannel: "email"
+  # Link di accesso diretto nell'email con il codice. Alcuni provider
+  # (Microsoft 365) scartano le email il cui link contiene indirizzo e codice:
+  # con false l'email contiene solo il codice.
+  emailMagicLink: true
 
 # ---------------------------------------------------------------------------
 # Email (SMTP)

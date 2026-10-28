@@ -22,6 +22,10 @@ const authSchema = z.object({
   otpCooldownSeconds: z.number().int().min(10).default(60),
   allowedDomains: z.array(z.string()).optional(),
   defaultChannel: z.enum(["email", "whatsapp", "both"]).default("email"),
+  // Sign-in link next to the code in the OTP e-mail. Some receivers drop a
+  // mail whose link carries the address and the code (Microsoft 365 does);
+  // off, the mail carries the code alone.
+  emailMagicLink: z.boolean().default(true),
 });
 
 // ---------------------------------------------------------------------------
