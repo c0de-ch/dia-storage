@@ -4,7 +4,7 @@ import { vi } from "vitest";
 vi.mock("@/lib/config/loader", () => ({
   getConfig: vi.fn(() => ({
     app: { name: "Dia-Storage", url: "https://dia.example.com" },
-    auth: { otpExpiryMinutes: 10 },
+    auth: { otpExpiryMinutes: 10, emailMagicLink: true },
     email: {
       host: "smtp.example.com",
       port: 587,
@@ -47,6 +47,7 @@ import {
   sendShareNotificationEmail,
 } from "@/lib/email/transport";
 import { getOtpEmailTemplate } from "@/lib/email/templates";
+import { getConfig } from "@/lib/config/loader";
 
 // ---------------------------------------------------------------------------
 // sendOtpEmail
@@ -105,6 +106,18 @@ describe("sendOtpEmail", () => {
     const magicLink = callArgs[1] as string;
     expect(magicLink).toContain("email=user%40test.com");
     expect(magicLink).toContain("code=654321");
+  });
+
+  it("sends the code alone when auth.emailMagicLink is off", async () => {
+    const base = getConfig();
+    vi.mocked(getConfig).mockReturnValueOnce({
+      ...base,
+      auth: { ...base.auth, emailMagicLink: false },
+    } as ReturnType<typeof getConfig>);
+
+    await sendOtpEmail("user@test.com", "654321");
+
+    expect(getOtpEmailTemplate).toHaveBeenCalledWith("654321", undefined);
   });
 });
 

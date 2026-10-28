@@ -49,7 +49,11 @@ export async function sendOtpEmail(
   const config = getConfig();
   const transport = getTransport();
   const baseUrl = origin ?? config.app.url;
-  const magicLink = `${baseUrl}/api/v1/auth/magic-link?email=${encodeURIComponent(email)}&code=${encodeURIComponent(code)}`;
+  // auth.emailMagicLink off: code only. A link with the address and the code
+  // in its URL is dropped by some receivers (Microsoft 365).
+  const magicLink = config.auth.emailMagicLink
+    ? `${baseUrl}/api/v1/auth/magic-link?email=${encodeURIComponent(email)}&code=${encodeURIComponent(code)}`
+    : undefined;
   const { subject, html, text } = getOtpEmailTemplate(code, magicLink);
 
   await transport.sendMail({
