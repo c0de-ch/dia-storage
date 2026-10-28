@@ -1,0 +1,246 @@
+# Default values for the dia-storage chart.
+
+# Keep at 1: the data volume is ReadWriteOnce and the app runs its backup
+# scheduler in-process. Updates use the Recreate strategy for the same reason.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/c0de-ch/dia-storage
+  # Defaults to the chart's appVersion. CD sets this to the sha-<commit> tag.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Non-secret settings: rendered as config.yaml and mounted at
+# /etc/dia-storage/config.yaml. Same keys as config.yaml.example in the
+# repository. Anything set through DIA_<SECTION>__<FIELD> environment
+# variables (the secret below, extraEnv) wins over this file.
+config:
+  app:
+    name: Dia-Storage
+    # Public URL: used in the e-mails (magic links) and by the macOS uploader.
+    url: http://localhost:3000
+    timezone: Europe/Rome
+    logLevel: info
+  auth:
+    otpLength: 6
+    otpExpiryMinutes: 10
+    sessionExpiryDays: 30
+    maxOtpAttempts: 5
+    otpCooldownSeconds: 60
+    defaultChannel: email
+    # allowedDomains: [example.com]
+  email:
+    # host, port, secure, user, password and from come from the secret
+    # (DIA_EMAIL__HOST, ...). Only the display name is public.
+    fromName: Dia-Storage
+  whatsapp:
+    enabled: false
+  storage:
+    # Overridden by persistence.mountPath (DIA_STORAGE__BASE_PATH).
+    basePath: /data
+    thumbnailWidth: 400
+    thumbnailQuality: 80
+    mediumWidth: 1600
+    mediumQuality: 85
+    maxUploadSizeMb: 100
+  backup:
+    # The app's own backup to S3 or a NAS share. Credentials for S3 are set
+    # in the admin settings page (stored in the database), not here.
+    enabled: false
+    schedule: "0 2 * * *"
+    retainDays: 90
+    includeDatabase: true
+    destinations: []
+  remoteHelp:
+    enabled: false
+    provider: none
+
+# Secret settings as environment variables: DIA_EMAIL__HOST, DIA_EMAIL__PORT,
+# DIA_EMAIL__SECURE, DIA_EMAIL__USER, DIA_EMAIL__PASSWORD, DIA_EMAIL__FROM
+# (SMTP for the OTP codes), optionally DIA_WHATSAPP__PHONE_NUMBER_ID,
+# DIA_WHATSAPP__ACCESS_TOKEN and ANTHROPIC_API_KEY. Either point at an
+# existing Secret (a SealedSecret in GitOps) or let the chart create one from
+# the map below (only for quick installs: the values end up in the release
+# history).
+secrets:
+  existingSecret: ""
+  create: {}
+  #  DIA_EMAIL__HOST: smtp.example.com
+  #  DIA_EMAIL__PORT: "587"
+  #  DIA_EMAIL__SECURE: "false"
+  #  DIA_EMAIL__USER: ""
+  #  DIA_EMAIL__PASSWORD: ""
+  #  DIA_EMAIL__FROM: noreply@example.com
+
+# Extra environment variables for the app, as a list of EnvVar objects.
+extraEnv: []
+
+# Originals, thumbnails, medium-size images and the incoming queue, all under
+# one volume. About 50 GB per 1000 slides at 22 MP.
+persistence:
+  enabled: true
+  # Use a claim that exists instead of creating one.
+  existingClaim: ""
+  storageClass: ""        # empty: the cluster default
+  accessModes: [ReadWriteOnce]
+  size: 50Gi
+  mountPath: /data
+  # Keep the claim (and the slides) when the release is deleted.
+  keepOnDelete: true
+
+database:
+  # PostgreSQL run by the CloudNativePG operator (the operator must already be
+  # installed). The operator creates <release>-db-app with the key `uri`.
+  cnpg:
+    enabled: true
+    instances: 1
+    imageName: ""         # empty: the operator's default PostgreSQL image
+    storage:
+      size: 5Gi
+      storageClass: ""    # empty: the cluster default
+    database: dia_storage
+    owner: dia
+    # Labels for the database pods and volumes, e.g. {c0de.ch/velero: skip}.
+    inheritedLabels: {}
+    resources: {}
+    # Enable when the Prometheus Operator is installed.
+    monitoring: false
+  # Used when cnpg.enabled is false: a Secret holding the connection string.
+  external:
+    existingSecret: ""
+    key: DATABASE_URL
+  # Nightly pg_dump into <mountPath>/db-dumps on the data volume, so a file
+  # backup of that volume (Velero) also carries a consistent copy of the
+  # database. The job runs on the node of the app pod, which holds the
+  # ReadWriteOnce volume.
+  dump:
+    enabled: false
+    schedule: "0 1 * * *"
+    keepDays: 14
+    image: ghcr.io/cloudnative-pg/postgresql:17
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+
+# Before the app starts, an init container pushes the Drizzle schema
+# (`drizzle-kit push`), applies drizzle/*.sql (search vector trigger) and
+# creates the admin user. It retries until the database answers.
+migrate:
+  enabled: true
+  # Allow changes that drop data (removed columns or tables). Off by default:
+  # such a change then stops the rollout instead of deleting data.
+  acceptDataLoss: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+# First admin user (scripts/seed.ts). The user signs in with an OTP sent to
+# this address, so the SMTP settings must work. Idempotent: an existing user
+# is kept. Empty: no seed.
+seed:
+  adminEmail: ""
+  adminName: Amministratore
+
+service:
+  type: ClusterIP
+  port: 80
+
+# Response headers set on every route (the job Caddy used to do). HSTS
+# assumes TLS ends in front of the Gateway, as on k8s01.
+securityHeaders:
+  enabled: true
+  headers:
+    X-Frame-Options: DENY
+    X-Content-Type-Options: nosniff
+    Referrer-Policy: strict-origin-when-cross-origin
+    Strict-Transport-Security: max-age=31536000; includeSubDomains
+    Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+
+# Gateway API routes. Each entry becomes one HTTPRoute.
+httpRoutes: []
+#  - name: lan
+#    parentRefs:
+#      - name: lan
+#        namespace: gateway
+#    hostnames:
+#      - dia-storage.example.com
+#    # TLS ends in front of the Gateway: tell the app the client used https.
+#    forwardedProtoHttps: true
+#    # Optional, for slow uploads from outside the LAN (Gateway API v1.1,
+#    # needs an implementation that honours it).
+#    requestTimeout: 300s
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: dia-storage.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+# The image runs as uid 1001. fsGroup makes the data volume writable;
+# OnRootMismatch skips the recursive chown of a large volume at every start.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# Sharp decodes 22 MP JPEGs in memory; the limit leaves room for a batch.
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    memory: 2Gi
+
+# /api/v1/health answers 200 only when the database responds, so it gates
+# readiness and startup. Liveness only checks that the server accepts
+# connections: a database outage must not restart the app.
+probes:
+  path: /api/v1/health
+  startup:
+    periodSeconds: 5
+    failureThreshold: 36
+  liveness:
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

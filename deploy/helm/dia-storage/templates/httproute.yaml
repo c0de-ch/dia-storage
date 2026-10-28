@@ -1,0 +1,41 @@
+{{- range .Values.httpRoutes }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "dia-storage.fullname" $ }}-{{ .name }}
+  labels:
+    {{- include "dia-storage.labels" $ | nindent 4 }}
+spec:
+  parentRefs:
+    {{- toYaml .parentRefs | nindent 4 }}
+  hostnames:
+    {{- toYaml .hostnames | nindent 4 }}
+  rules:
+    - {{- if or .forwardedProtoHttps $.Values.securityHeaders.enabled }}
+      filters:
+        {{- if .forwardedProtoHttps }}
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: X-Forwarded-Proto
+                value: https
+        {{- end }}
+        {{- if $.Values.securityHeaders.enabled }}
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              {{- range $name, $value := $.Values.securityHeaders.headers }}
+              - name: {{ $name }}
+                value: {{ $value | quote }}
+              {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- with .requestTimeout }}
+      timeouts:
+        request: {{ . }}
+      {{- end }}
+      backendRefs:
+        - name: {{ include "dia-storage.fullname" $ }}
+          port: {{ $.Values.service.port }}
+{{- end }}

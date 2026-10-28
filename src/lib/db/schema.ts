@@ -185,6 +185,9 @@ export const slides = pgTable(
     index("slides_date_taken_idx").on(table.dateTakenPrecise),
     index("slides_checksum_idx").on(table.checksum),
     index("slides_backed_up_idx").on(table.backedUp),
+    // Same index as drizzle/0001_search_vector.sql; declared here so that
+    // `drizzle-kit push` keeps it instead of dropping an index it does not know.
+    index("slides_search_vector_idx").using("gin", table.searchVector),
   ]
 );
 

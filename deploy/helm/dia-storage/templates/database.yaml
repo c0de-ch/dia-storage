@@ -1,0 +1,40 @@
+{{- if .Values.database.cnpg.enabled }}
+{{- $db := .Values.database.cnpg }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "dia-storage.dbClusterName" . }}
+  labels:
+    {{- include "dia-storage.labels" . | nindent 4 }}
+  annotations:
+    # The CRD comes from the CloudNativePG operator, possibly installed in the
+    # same sync wave on a fresh cluster.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  instances: {{ $db.instances }}
+  {{- with $db.imageName }}
+  imageName: {{ . }}
+  {{- end }}
+  storage:
+    size: {{ $db.storage.size }}
+    {{- with $db.storage.storageClass }}
+    storageClass: {{ . }}
+    {{- end }}
+  bootstrap:
+    initdb:
+      database: {{ $db.database }}
+      owner: {{ $db.owner }}
+  {{- with $db.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $db.inheritedLabels }}
+  inheritedMetadata:
+    labels:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
+  {{- if $db.monitoring }}
+  monitoring:
+    enablePodMonitor: true
+  {{- end }}
+{{- end }}

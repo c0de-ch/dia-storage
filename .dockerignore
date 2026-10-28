@@ -1,0 +1,27 @@
+# Build context for the Dockerfile: sources and lock file only.
+node_modules
+.next
+out
+build
+coverage
+tsconfig.tsbuildinfo
+
+# runtime data and local config never go into the image
+data
+storage
+uploads
+config.yaml
+.env
+.env.*
+
+# not needed to build the server
+.git
+.github
+.idea
+.vscode
+macos
+deploy
+docker-compose*.yml
+*.md
+*.pdf
+.DS_Store

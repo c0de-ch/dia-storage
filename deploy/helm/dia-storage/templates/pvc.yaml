@@ -1,0 +1,23 @@
+{{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "dia-storage.dataClaimName" . }}
+  labels:
+    {{- include "dia-storage.labels" . | nindent 4 }}
+  {{- if .Values.persistence.keepOnDelete }}
+  annotations:
+    # The slides outlive the release: uninstalling (or pruning in Argo CD)
+    # leaves this claim in place.
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.accessModes | nindent 4 }}
+  {{- with .Values.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}

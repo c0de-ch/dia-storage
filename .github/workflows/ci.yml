@@ -8,46 +8,87 @@ on:
 
 jobs:
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run lint
 
   type-check:
+    name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run type-check
 
   test:
+    name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run test:coverage
 
+  helm:
+    name: Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: azure/setup-helm@v5
+      - run: helm lint deploy/helm/dia-storage -f deploy/helm/dia-storage/ci/test-values.yaml
+      - run: helm template dia-storage deploy/helm/dia-storage -f deploy/helm/dia-storage/ci/test-values.yaml > /dev/null
+      # CD publishes a chart only when its version is new, so a chart change
+      # without a version bump would never reach the cluster.
+      - name: Chart version bumped when the chart changes
+        if: github.event_name == 'pull_request'
+        run: |
+          base="origin/${{ github.base_ref }}"
+          chart=deploy/helm/dia-storage
+          if git diff --quiet "$base"...HEAD -- "$chart" ":(exclude)$chart/ci"; then
+            echo "Chart unchanged"
+            exit 0
+          fi
+          old=$(git show "$base:$chart/Chart.yaml" 2>/dev/null | awk '/^version:/ {print $2}')
+          new=$(awk '/^version:/ {print $2}' "$chart/Chart.yaml")
+          if [ "$old" = "$new" ]; then
+            echo "::error file=$chart/Chart.yaml::The chart changed but its version is still $new. Bump it so CD publishes the change."
+            exit 1
+          fi
+          echo "Chart version ${old:-none} -> $new"
+
   build:
+    name: Build
     needs: [lint, type-check, test]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run build
+
+  docker:
+    name: Docker Build
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t dia-storage:test .
