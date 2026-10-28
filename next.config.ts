@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Self-contained server for the container image (Dockerfile copies
+  // .next/standalone, .next/static and public).
+  output: "standalone",
   allowedDevOrigins: ["192.168.78.87"],
   serverExternalPackages: ["sharp"],
   // Every <Image> src in the app points at an auth-protected /api/v1/slides/*

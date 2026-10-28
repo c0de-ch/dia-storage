@@ -1,0 +1,19 @@
+Dia-Storage {{ include "dia-storage.imageTag" . }} is installed as {{ include "dia-storage.fullname" . }}.
+{{- range .Values.httpRoutes }}
+  {{- range .hostnames }}
+  https://{{ . }}
+  {{- end }}
+{{- end }}
+{{- if and (not .Values.httpRoutes) (not .Values.ingress.enabled) }}
+
+No route is configured. Reach the app with:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "dia-storage.fullname" . }} 3000:{{ .Values.service.port }}
+{{- end }}
+{{- if .Values.seed.adminEmail }}
+
+Sign in as {{ .Values.seed.adminEmail }}: the OTP code arrives by e-mail.
+{{- else }}
+
+No admin user was seeded (seed.adminEmail is empty).
+{{- end }}
+Slides live on the claim {{ include "dia-storage.dataClaimName" . }} ({{ .Values.persistence.size }}).

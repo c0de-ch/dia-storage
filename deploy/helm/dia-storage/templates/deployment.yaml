@@ -1,0 +1,171 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dia-storage.fullname" . }}
+  labels:
+    {{- include "dia-storage.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 5
+  # One writer on the ReadWriteOnce volume and one backup scheduler: the old
+  # pod stops before the new one starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "dia-storage.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "dia-storage.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: app
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "dia-storage.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.migrate.enabled }}
+      initContainers:
+        - name: db-setup
+          image: {{ include "dia-storage.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: /opt/tools
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -u
+              # 1. Wait for the database, then push the schema.
+              ok=
+              for i in $(seq 1 60); do
+                if ./node_modules/.bin/drizzle-kit push{{ if .Values.migrate.acceptDataLoss }} --force{{ end }}; then
+                  ok=1
+                  break
+                fi
+                echo "drizzle-kit push failed (attempt $i), retrying in 5s"
+                sleep 5
+              done
+              [ -n "$ok" ] || exit 1
+              # 2. Extension, trigger and index for the full-text search.
+              ./node_modules/.bin/tsx scripts/apply-sql.ts || exit 1
+              {{- if .Values.seed.adminEmail }}
+              # 3. The first admin user (kept if it exists).
+              ./node_modules/.bin/tsx scripts/seed.ts || exit 1
+              {{- end }}
+          env:
+            {{- include "dia-storage.databaseUrlEnv" . | nindent 12 }}
+            - name: HOME
+              value: /tmp
+            - name: TMPDIR
+              value: /tmp
+            {{- if .Values.seed.adminEmail }}
+            - name: ADMIN_EMAIL
+              value: {{ .Values.seed.adminEmail | quote }}
+            - name: ADMIN_NAME
+              value: {{ .Values.seed.adminName | quote }}
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrate.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      {{- end }}
+      containers:
+        - name: app
+          image: {{ include "dia-storage.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          {{- with (include "dia-storage.secretName" .) }}
+          envFrom:
+            - secretRef:
+                name: {{ . }}
+          {{- end }}
+          env:
+            - name: CONFIG_PATH
+              value: /etc/dia-storage/config.yaml
+            # The upload routes and the image pipeline read the volume path
+            # from two settings; both point at the same mount.
+            - name: STORAGE_PATH
+              value: {{ .Values.persistence.mountPath | quote }}
+            - name: DIA_STORAGE__BASE_PATH
+              value: {{ .Values.persistence.mountPath | quote }}
+            - name: TZ
+              value: {{ .Values.config.app.timezone | quote }}
+            - name: APP_VERSION
+              value: {{ include "dia-storage.imageTag" . | quote }}
+            {{- include "dia-storage.databaseUrlEnv" . | nindent 12 }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.path }}
+              port: http
+            {{- toYaml .Values.probes.startup | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: http
+            {{- toYaml .Values.probes.liveness | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.path }}
+              port: http
+            {{- toYaml .Values.probes.readiness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/dia-storage
+              readOnly: true
+            - name: data
+              mountPath: {{ .Values.persistence.mountPath }}
+            - name: tmp
+              mountPath: /tmp
+            - name: next-cache
+              mountPath: /app/.next/cache
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "dia-storage.fullname" . }}
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "dia-storage.dataClaimName" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir: {}
+        - name: next-cache
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

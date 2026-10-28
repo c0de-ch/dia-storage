@@ -1,0 +1,65 @@
+{{- if .Values.database.dump.enabled }}
+{{- $dump := .Values.database.dump }}
+{{- $dumpDir := printf "%s/db-dumps" .Values.persistence.mountPath }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "dia-storage.fullname" . }}-db-dump
+  labels:
+    {{- include "dia-storage.labels" . | nindent 4 }}
+spec:
+  schedule: {{ $dump.schedule | quote }}
+  timeZone: {{ .Values.config.app.timezone | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+            {{- include "dia-storage.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: db-dump
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          # The data volume is ReadWriteOnce: run where the app pod runs.
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      {{- include "dia-storage.selectorLabels" . | nindent 22 }}
+                      app.kubernetes.io/component: app
+          containers:
+            - name: pg-dump
+              image: {{ $dump.image }}
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  mkdir -p {{ $dumpDir }}
+                  out="{{ $dumpDir }}/{{ .Values.database.cnpg.database }}-$(date +%Y%m%d-%H%M%S).dump"
+                  pg_dump --format=custom --no-owner --file="$out.part" "$DATABASE_URL"
+                  mv "$out.part" "$out"
+                  find {{ $dumpDir }} -name '*.dump' -mtime +{{ $dump.keepDays }} -delete
+                  ls -lh {{ $dumpDir }}
+              env:
+                {{- include "dia-storage.databaseUrlEnv" . | nindent 16 }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              resources:
+                {{- toYaml $dump.resources | nindent 16 }}
+              volumeMounts:
+                - name: data
+                  mountPath: {{ .Values.persistence.mountPath }}
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: {{ include "dia-storage.dataClaimName" . }}
+{{- end }}

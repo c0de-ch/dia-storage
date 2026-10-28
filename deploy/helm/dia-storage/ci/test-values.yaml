@@ -1,0 +1,25 @@
+# Values for helm lint / helm template in CI: every optional resource on.
+secrets:
+  create:
+    DIA_EMAIL__HOST: smtp.example.com
+    DIA_EMAIL__PORT: "587"
+    DIA_EMAIL__FROM: noreply@example.com
+seed:
+  adminEmail: admin@example.com
+httpRoutes:
+  - name: lan
+    parentRefs:
+      - name: lan
+        namespace: gateway
+    hostnames: [dia-storage.example.com]
+    forwardedProtoHttps: true
+    requestTimeout: 300s
+ingress:
+  enabled: true
+database:
+  cnpg:
+    inheritedLabels:
+      c0de.ch/velero: skip
+    monitoring: true
+  dump:
+    enabled: true

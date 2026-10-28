@@ -17,23 +17,29 @@ Dia-Storage permette di:
 ## Architettura
 
 ```
-┌──────────────────┐     ┌──────────────────────────────────────┐
-│   macOS           │     │   VPS (Docker)                        │
-│   Dia-Uploader    │────>│   ┌─────────┐  ┌──────────────────┐ │
-│   (menu bar app)  │     │   │ Caddy    │  │ Next.js 16       │ │
-│                   │     │   │ (HTTPS)  │─>│ App Router       │ │
-│   SD card ─> API  │     │   └─────────┘  │ shadcn/ui        │ │
-└──────────────────┘     │                 │ Drizzle ORM      │ │
-                          │                 └────────┬─────────┘ │
-                          │                          │            │
-                          │                 ┌────────▼─────────┐ │
-                          │                 │ PostgreSQL 17    │ │
-                          │                 └──────────────────┘ │
-                          │                                      │
-                          │   /app/data/                         │
-                          │     incoming/  originals/  thumbs/   │
-                          └──────────────────────────────────────┘
+┌──────────────────┐     ┌──────────────────────────────────────────────┐
+│   macOS           │     │   Kubernetes k8s01 (Argo CD + Helm)           │
+│   Dia-Uploader    │────>│   ┌──────────┐   ┌──────────────────────┐   │
+│   (menu bar app)  │     │   │ Gateway  │   │ Deployment           │   │
+│                   │     │   │ (HTTP)   │──>│ Next.js 16 App Router│   │
+│   SD card ─> API  │     │   └──────────┘   │ shadcn/ui, Drizzle   │   │
+└──────────────────┘     │        ▲          └──────────┬───────────┘   │
+   HTTPS via Caddy ───────┘        │                     │               │
+   sul firewall                    │          ┌──────────▼───────────┐   │
+                                   │          │ CloudNativePG        │   │
+                                   │          │ PostgreSQL 17        │   │
+                                   │          └──────────────────────┘   │
+                                   │                                     │
+                                   │   PVC /data (iSCSI, backup Velero)   │
+                                   │     incoming/ originals/ thumbnails/ │
+                                   │     medium/   db-dumps/              │
+                                   └─────────────────────────────────────┘
 ```
+
+Il deployment è GitOps: il chart Helm in `deploy/helm/dia-storage` viene
+pubblicato su `oci://ghcr.io/c0de-ch/charts`, i valori per il cluster vivono in
+[lab-k8s01-gitops](https://github.com/c0de-ch/lab-k8s01-gitops) (`apps/dia-storage`)
+e Argo CD applica ogni merge su `main` di quel repository.
 
 ## Workflow
 
@@ -55,7 +61,7 @@ Dia-Storage permette di:
 | Image Processing | Sharp + exifr |
 | Backup | @aws-sdk/client-s3 (S3-compatible) + NAS |
 | macOS App | Swift + SwiftUI (menu bar app) |
-| Deployment | Docker + Docker Compose + Caddy |
+| Deployment | Kubernetes (k8s01) + Helm + Argo CD, immagine su GHCR |
 
 ## Scanner Supportato
 
@@ -67,30 +73,40 @@ Dia-Storage permette di:
 
 ## Requisiti
 
-- **Server**: VPS Linux con Docker e Docker Compose
+- **Server**: cluster Kubernetes con Argo CD, CloudNativePG, Gateway API e
+  una StorageClass (k8s01, vedi lab-k8s01-gitops); in alternativa `helm install`
+  su qualsiasi cluster con l'operatore CloudNativePG
 - **Client**: macOS con browser moderno (per l'app web)
 - **macOS App**: macOS 13+ (Ventura o successivo)
 - **Storage**: Almeno 250GB per ~5000 diapositive
 
 ## Installazione Rapida
 
-### Server (Docker)
+### Server (Kubernetes, k8s01)
+
+Il deployment su k8s01 non richiede comandi: dopo un merge su `main` il workflow
+`Publish & Deploy` costruisce l'immagine `ghcr.io/c0de-ch/dia-storage:sha-<commit>`,
+pubblica il chart se la sua versione è nuova e apre una pull request su
+lab-k8s01-gitops con il nuovo tag. Il merge di quella PR è il deploy; il revert
+è il rollback. Lo schema del database (`drizzle-kit push`, `drizzle/*.sql`) e
+l'utente admin (`seed.adminEmail`) vengono applicati da un init container a ogni
+avvio.
+
+Configurazione del cluster, in lab-k8s01-gitops:
+
+- `apps/dia-storage/values.yaml`: URL pubblico, dimensione del volume, route
+- `apps/dia-storage/sealed-secrets.yaml`: SMTP per i codici OTP (`DIA_EMAIL__*`)
+- `applications/dia-storage.yaml`: l'Application Argo CD (versione del chart)
+
+Vedi `deploy/helm/dia-storage/README.md` per un'installazione manuale con
+`helm install` su un altro cluster.
+
+### Immagine container
 
 ```bash
-# Clona il repository
-git clone git@github-c0de:c0de-ch/dia-storage.git
-cd dia-storage
-
-# Copia e configura
-cp config.yaml.example config.yaml
-# Modifica config.yaml con le tue impostazioni
-
-# Avvia con Docker Compose
-docker compose up -d
-
-# Esegui le migrazioni e crea l'utente admin
-docker compose exec app npx drizzle-kit push
-docker compose exec app npx tsx scripts/seed.ts
+docker build -t dia-storage:local .
+# l'immagine contiene il server standalone (/app), gli strumenti per il
+# database in /opt/tools (drizzle-kit, tsx, schema, scripts) e pg_dump 17
 ```
 
 ### Sviluppo Locale
@@ -147,7 +163,8 @@ dia-storage/
     lib/              # Business logic, auth, DB, processing
     hooks/            # React hooks
   macos/              # macOS companion app (Swift)
-  docker/             # Docker deployment files
+  deploy/helm/        # Helm chart (published to oci://ghcr.io/c0de-ch/charts)
+  Dockerfile          # Container image for Kubernetes
   drizzle/            # Database migrations
   config.yaml         # System configuration
 ```

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: dia-storage
+description: Dia-Storage, the family archive of scanned 35mm slides (Next.js, PostgreSQL through CloudNativePG, one data volume)
+type: application
+# Bump for every chart change; CI publishes each new version to
+# oci://ghcr.io/c0de-ch/charts/dia-storage.
+version: 0.1.0
+# The image tag used when values.image.tag is empty.
+appVersion: "latest"
+home: https://github.com/c0de-ch/dia-storage
+sources:
+  - https://github.com/c0de-ch/dia-storage
+maintainers:
+  - name: c0de-ch
